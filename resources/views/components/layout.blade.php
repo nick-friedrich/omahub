@@ -27,6 +27,7 @@
                 <nav class="flex items-center gap-1 text-sm sm:gap-2">
                     <a href="{{ route('home') }}" class="rounded-md px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900">Home</a>
                     <a href="{{ route('plugins.index') }}" class="rounded-md px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900">Plugins</a>
+                    <a href="{{ route('resources.index') }}" class="rounded-md px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900">Resources</a>
                     <a href="{{ route('submit') }}" class="rounded-md px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900">Submit</a>
                 </nav>
 

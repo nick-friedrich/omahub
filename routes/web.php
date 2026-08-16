@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\GitHubAuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PluginController;
+use App\Http\Controllers\ResourcesController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SubmitController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,7 @@ Route::get('/plugins', [PluginController::class, 'index'])->name('plugins.index'
 Route::get('/plugins/{plugin:slug}', [PluginController::class, 'show'])->name('plugins.show');
 Route::get('/categories/{category:slug}', [CategoryController::class, 'show'])->name('categories.show');
 Route::get('/search', [SearchController::class, 'index'])->name('search');
+Route::get('/resources', ResourcesController::class)->name('resources.index');
 
 // GitHub OAuth sign-in.
 Route::get('/auth/github/redirect', [GitHubAuthController::class, 'redirect'])->name('auth.github.redirect');

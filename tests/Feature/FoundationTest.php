@@ -27,4 +27,13 @@ class FoundationTest extends TestCase
     {
         $this->get('/')->assertOk();
     }
+
+    public function test_resources_page_is_available(): void
+    {
+        $this->get('/resources')
+            ->assertOk()
+            ->assertSee('https://omarchy.org', false)
+            ->assertSee('https://bjarneo.github.io/omarchy-themes/', false)
+            ->assertSee('Omarchy Themes');
+    }
 }
