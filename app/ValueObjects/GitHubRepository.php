@@ -25,7 +25,10 @@ final readonly class GitHubRepository
             throw new InvalidGitHubRepositoryUrl;
         }
 
-        $segments = array_values(array_filter(explode('/', trim($parts['path'] ?? '', '/')), 'strlen'));
+        $segments = array_values(array_filter(
+            explode('/', trim($parts['path'] ?? '', '/')),
+            static fn (string $segment): bool => $segment !== '',
+        ));
 
         if (count($segments) !== 2) {
             throw new InvalidGitHubRepositoryUrl;

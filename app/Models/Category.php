@@ -14,6 +14,7 @@ class Category extends Model
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
 
+    /** @return BelongsToMany<Plugin, $this> */
     public function plugins(): BelongsToMany
     {
         return $this->belongsToMany(Plugin::class);

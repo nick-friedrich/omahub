@@ -1,0 +1,16 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+
+    # Level 1 is the lowest, 10 the highest. Laravel projects commonly start at 5.
+    level: 5
+
+    # Larastan reflects the casts() method to infer attribute types. In
+    # reflection mode the inferred return type of casts() is a plain `array`,
+    # so enum casts (e.g. status => PluginStatus::class) are not recognized and
+    # model properties fall back to their database column type. Parsing the
+    # method source instead resolves the constant values correctly.
+    parseModelCastsMethod: true
