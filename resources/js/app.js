@@ -43,3 +43,48 @@ if (document.readyState === 'loading') {
 } else {
     highlightReadmes();
 }
+
+// Copy-to-clipboard for `data-copy-command` buttons. Progressive enhancement:
+// without JavaScript the command stays visible and selectable, and the button
+// simply does nothing.
+function setupCopyButtons() {
+    document.querySelectorAll('button[data-copy-command]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const box = button.closest('.install-command');
+            const code = box && box.querySelector('code');
+            const text = (code && (code.textContent ?? ''))
+                .replace(/^\s*\$\s+/, '')
+                .trim();
+
+            if (!text || !navigator.clipboard) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(text);
+
+                const label = button.querySelector('[data-copy-label]');
+                const icon = button.querySelector('[data-copy-icon]');
+                const successIcon = button.querySelector('[data-copy-success-icon]');
+
+                if (label) label.textContent = 'Copied';
+                if (icon) icon.classList.add('hidden');
+                if (successIcon) successIcon.classList.remove('hidden');
+
+                setTimeout(() => {
+                    if (label) label.textContent = 'Copy';
+                    if (icon) icon.classList.remove('hidden');
+                    if (successIcon) successIcon.classList.add('hidden');
+                }, 2000);
+            } catch {
+                // Leave the button unchanged; the command is still selectable.
+            }
+        });
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupCopyButtons);
+} else {
+    setupCopyButtons();
+}

@@ -52,6 +52,10 @@
         </div>
     </header>
 
+    <x-plugin-security-notice :plugin="$plugin" />
+
+    <x-install-command command="omarchy plugin add {{ $plugin->repository_url }} --enable" />
+
     <div class="mt-6 flex flex-wrap gap-2 text-xs">
         @foreach ($plugin->categories as $category)
             <a href="{{ route('plugins.index', ['category' => $category->slug]) }}" class="rounded-full bg-gray-100 px-3 py-1 font-medium hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700">
