@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.nick-friedrich.hyprland-dock",
+  "name": "Hyprland Dock",
+  "version": "1.0.0",
+  "author": "Nick Friedrich",
+  "license": "MIT",
+  "description": "A configurable macOS-inspired application dock for Hyprland.",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Overlay.qml"
+  }
+}

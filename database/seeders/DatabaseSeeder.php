@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\PluginStatus;
 use App\Models\Category;
 use App\Models\Plugin;
 use App\Models\Tag;
@@ -29,29 +30,46 @@ class DatabaseSeeder extends Seeder
             ])],
         );
 
-        $plugins = collect([
-            ['name' => 'Workspace Switcher', 'owner' => 'omarchy-labs', 'repo' => 'workspace-switcher'],
-            ['name' => 'Now Playing', 'owner' => 'omarchy-labs', 'repo' => 'now-playing'],
-            ['name' => 'Project Launcher', 'owner' => 'community-tools', 'repo' => 'project-launcher'],
-        ])->map(function (array $plugin): Plugin {
-            return Plugin::factory()->published()->create([
-                'name' => $plugin['name'],
-                'slug' => $plugin['repo'],
-                'repository_url' => "https://github.com/{$plugin['owner']}/{$plugin['repo']}",
-                'repository_owner' => $plugin['owner'],
-                'repository_name' => $plugin['repo'],
-                'author_name' => $plugin['owner'],
-                'author_url' => "https://github.com/{$plugin['owner']}",
-            ]);
-        });
+        // Seed the registry's real, already-published plugin rather than demo data.
+        $this->seedPublishedPlugin();
+    }
 
-        $plugins[0]->categories()->attach($categories['Desktop']);
-        $plugins[0]->tags()->attach([$tags['Hyprland']->id, $tags['Productivity']->id]);
-        $plugins[1]->categories()->attach($categories['Media']);
-        $plugins[1]->tags()->attach($tags['Waybar']);
-        $plugins[2]->categories()->attach($categories['Development']);
-        $plugins[2]->tags()->attach([$tags['Terminal']->id, $tags['Productivity']->id]);
+    private function seedPublishedPlugin(): void
+    {
+        $fixture = database_path('seeders/fixtures/hyprland-dock');
 
-        Plugin::factory()->count(2)->create();
+        $manifest = json_decode(
+            (string) file_get_contents("{$fixture}/manifest.json"),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        Plugin::query()->create([
+            'slug' => 'io.github.nick-friedrich.hyprland-dock',
+            'name' => 'Hyprland Dock',
+            'description' => 'A configurable macOS-inspired application dock for Hyprland.',
+            'repository_url' => 'https://github.com/nick-friedrich/hyprland-dock',
+            'repository_owner' => 'nick-friedrich',
+            'repository_name' => 'hyprland-dock',
+            'author_name' => 'Nick Friedrich',
+            'author_url' => 'https://github.com/nick-friedrich',
+            'license' => 'MIT',
+            'homepage_url' => null,
+            'icon_url' => null,
+            'manifest_data' => $manifest,
+            'readme_markdown' => (string) file_get_contents("{$fixture}/README.md"),
+            'default_branch' => 'master',
+            'latest_commit_sha' => '2725296a28123dfb16aab2ad9127f1f3abf3eca3',
+            'latest_version' => '1.0.0',
+            'stars_count' => 0,
+            'forks_count' => 0,
+            'open_issues_count' => 0,
+            'is_archived' => false,
+            'last_pushed_at' => now(),
+            'last_indexed_at' => now(),
+            'published_at' => now(),
+            'status' => PluginStatus::Published,
+        ]);
     }
 }
