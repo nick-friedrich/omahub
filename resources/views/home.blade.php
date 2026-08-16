@@ -6,6 +6,12 @@
             <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">manifest.json</code>.
         </p>
 
+        @if (session('status') === 'github_auth_unconfigured')
+            <p class="mx-auto mt-4 max-w-xl rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                GitHub sign in isn't configured yet. Set <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code> in your <code>.env</code>.
+            </p>
+        @endif
+
         <form action="{{ route('search') }}" method="GET" class="mx-auto mt-6 flex max-w-md gap-2">
             <input
                 type="search"

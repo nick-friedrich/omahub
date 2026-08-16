@@ -52,11 +52,40 @@ php artisan plugins:refresh --dry-run       # list targets without calling GitHu
 
 Refresh is idempotent: re-importing a repository updates the existing plugin in place and preserves its status. If a repository has moved, the existing row is updated to its new owner/name instead of creating a duplicate. Failures (repos without a root `manifest.json`, or moved or deleted repositories) are reported per plugin and the run continues; only a GitHub API rate limit stops the run early, with the resume command printed. The importer fetches the README from the repository's default branch. Set `GITHUB_TOKEN` in `.env` (e.g. `echo "GITHUB_TOKEN=$(gh auth token)" >> .env`) to avoid the unauthenticated rate limit when refreshing many plugins at once.
 
+## Authentication (GitHub OAuth)
+
+Sign-in is required to submit a plugin, which keeps the registry spam-free. Configuring it requires a GitHub OAuth App:
+
+1. Create an OAuth App at <https://github.com/settings/developers> (Homepage URL: `APP_URL`, Authorization callback URL: `<APP_URL>/auth/github/callback`).
+2. Copy its Client ID and Client Secret into `.env`:
+
+```bash
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_REDIRECT_URI=
+GITHUB_ADMIN_USERNAMES=
+```
+
+`GITHUB_REDIRECT_URI` defaults to `<APP_URL>/auth/github/callback`; set it explicitly only to override. `GITHUB_ADMIN_USERNAMES` is a comma-separated list of GitHub logins granted admin access when they sign in (e.g. `GITHUB_ADMIN_USERNAMES=nick,sarah`). Admins can also be managed later with `php artisan user:admin --username=...` / `php artisan user:admin --username=... --remove`.
+
+Without these values, the “Sign in with GitHub” button shows a config notice in `.env` and sign-in is unavailable.
+
 ## Submissions
 
-Visitors can submit a plugin by pasting a public GitHub repository URL at `GET /submit`. The site form is rate limited and includes a honeypot for bots. Each submission runs the importer synchronously, records the outcome, and stays **pending** for a maintainer to review — nothing is published automatically.
+Visitors can submit a plugin by pasting a public GitHub repository URL at `GET /submit`. Submitting requires a signed-in GitHub account. The site form is rate limited and includes a honeypot for bots. Each submission runs the importer synchronously, records the outcome, and stays **pending** for a maintainer to review — nothing is published automatically.
 
-Review pending submissions as the admin (artisan is the backend interface for maintaining the database):
+## Admin interface
+
+Signing in with a GitHub login listed in `GITHUB_ADMIN_USERNAMES` (or granted via `php artisan user:admin`) exposes the admin area at `GET /admin`. From there you can:
+
+- **Submissions** — review pending submissions, approve (which publishes the imported plugin), or reject with an optional reason.
+- **Plugins** — list all listings (filtered by status), edit metadata (name, description, author, license, homepage) and categories/tags, re-import a single plugin from GitHub, change its status (publish/archive/reject/pending), or delete it.
+
+The admin routes are web forms (no API). They're guarded by an `admin` middleware that requires an authenticated user with `is_admin = true`.
+
+## Reviewing submissions from the CLI
+
+Pending submissions can also be reviewed from the terminal:
 
 ```bash
 php artisan submissions:list                      # show submissions awaiting review

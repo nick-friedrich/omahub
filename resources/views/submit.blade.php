@@ -6,6 +6,9 @@
             <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">manifest.json</code>
             at its root, and every entry point listed in it must exist in the repository.
         </p>
+        <p class="mt-2 text-gray-600 dark:text-gray-300">
+            You'll need to be signed in with your GitHub account to submit — this keeps the registry spam-free. Sign in using the button in the header.
+        </p>
 
         @if (session('status') === 'pending')
             <div class="mt-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="alert">
@@ -57,7 +60,7 @@
             </button>
 
             <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                Submissions are imported from GitHub immediately and stay pending until a maintainer approves them. Rate limiting applies.
+                Submissions are imported from GitHub immediately and stay pending until a maintainer approves them. Logging in with GitHub is required, and rate limiting applies.
             </p>
         </form>
 

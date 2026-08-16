@@ -6,6 +6,7 @@ use App\Enums\PluginStatus;
 use App\Enums\SubmissionStatus;
 use App\Models\Plugin;
 use App\Models\PluginSubmission;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -24,6 +25,9 @@ class SubmitControllerTest extends TestCase
         // The in-memory cache is shared across tests in a single process, so reset
         // the per-minute submission limiter between tests.
         Cache::flush();
+
+        // Submissions now require a signed-in GitHub account.
+        $this->actingAs(User::factory()->create());
     }
 
     public function test_submit_form_is_displayed(): void

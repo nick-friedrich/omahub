@@ -18,6 +18,11 @@ return [
         'token' => env('GITHUB_TOKEN'),
         'api_url' => env('GITHUB_API_URL', 'https://api.github.com'),
         'user_agent' => env('GITHUB_USER_AGENT', 'Omahub'),
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env('GITHUB_REDIRECT_URI', env('APP_URL').'/auth/github/callback'),
+        // Comma-separated GitHub usernames granted admin access when they sign in.
+        'admins' => array_filter(array_map('trim', explode(',', (string) env('GITHUB_ADMIN_USERNAMES', '')))),
     ],
 
     'postmark' => [
