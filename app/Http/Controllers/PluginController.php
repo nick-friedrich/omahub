@@ -31,7 +31,7 @@ class PluginController extends Controller
         return view('plugins.show', [
             'plugin' => $plugin,
             'readme' => $plugin->readme_markdown !== null
-                ? $markdown->render($plugin->readme_markdown)
+                ? $markdown->render($plugin->readme_markdown, $plugin->rawContentBaseUrl())
                 : null,
         ]);
     }

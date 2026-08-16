@@ -62,6 +62,20 @@ class Plugin extends Model
             ->where('published_at', '<=', now());
     }
 
+    /**
+     * Root directory for this plugin's raw content on GitHub, used to resolve
+     * relative image paths in the README. Returns null when repository identity
+     * is unavailable.
+     */
+    public function rawContentBaseUrl(): ?string
+    {
+        if (! is_string($this->default_branch) || $this->default_branch === '') {
+            return null;
+        }
+
+        return "https://raw.githubusercontent.com/{$this->repository_owner}/{$this->repository_name}/{$this->default_branch}";
+    }
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class);
