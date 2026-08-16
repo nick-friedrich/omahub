@@ -24,13 +24,12 @@ Route::post('/auth/logout', [GitHubAuthController::class, 'logout'])
     ->middleware('auth')
     ->name('auth.logout');
 
-// Submitting a plugin requires a signed-in account to discourage spam.
-Route::middleware('auth')->group(function (): void {
-    Route::get('/submit', [SubmitController::class, 'index'])->name('submit');
-    Route::post('/submit', [SubmitController::class, 'store'])
-        ->middleware('throttle:submissions')
-        ->name('submit.store');
-});
+// The submit form is public so visitors see what's needed; posting a
+// submission requires a signed-in account to discourage spam.
+Route::get('/submit', [SubmitController::class, 'index'])->name('submit');
+Route::post('/submit', [SubmitController::class, 'store'])
+    ->middleware(['auth', 'throttle:submissions'])
+    ->name('submit.store');
 
 // Admin-only area for reviewing submissions and maintaining published listings.
 Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): void {

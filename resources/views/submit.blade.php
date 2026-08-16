@@ -26,43 +26,64 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('submit.store') }}" class="mt-6 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-[#161615]">
-            @csrf
+        @auth
+            <form method="POST" action="{{ route('submit.store') }}" class="mt-6 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-[#161615]">
+                @csrf
 
-            {{-- Honeypot field for bots. Kept off-screen and unfilled by real visitors. --}}
-            <div class="hidden" aria-hidden="true">
-                <label for="website">Leave this field empty</label>
-                <input type="text" id="website" name="website" value="" tabindex="-1" autocomplete="off">
+                {{-- Honeypot field for bots. Kept off-screen and unfilled by real visitors. --}}
+                <div class="hidden" aria-hidden="true">
+                    <label for="website">Leave this field empty</label>
+                    <input type="text" id="website" name="website" value="" tabindex="-1" autocomplete="off">
+                </div>
+
+                <label for="repository_url" class="block text-sm font-medium">
+                    Repository URL
+                </label>
+                <input
+                    id="repository_url"
+                    name="repository_url"
+                    type="url"
+                    required
+                    placeholder="https://github.com/owner/plugin-name"
+                    value="{{ old('repository_url') }}"
+                    class="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-900"
+                >
+
+                @error('repository_url')
+                    <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+
+                <button
+                    type="submit"
+                    class="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                    Submit for review
+                </button>
+
+                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                    Submissions are imported from GitHub immediately and stay pending until a maintainer approves them. Logging in with GitHub is required, and rate limiting applies.
+                </p>
+            </form>
+        @else
+            <div class="mt-6 rounded-lg border border-gray-200 bg-white p-6 text-center dark:border-gray-800 dark:bg-[#161615]">
+                <h2 class="text-lg font-semibold">Sign in to submit a plugin</h2>
+                <p class="mx-auto mt-2 max-w-md text-sm text-gray-600 dark:text-gray-300">
+                    Sharing your plugin requires a GitHub account so we can keep the registry spam-free. It only takes a moment.
+                </p>
+                <a
+                    href="{{ route('auth.github.redirect') }}"
+                    class="mt-5 inline-flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-900"
+                >
+                    <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" clip-rule="evenodd" />
+                    </svg>
+                    Sign in with GitHub
+                </a>
+                <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    We only ask for your public GitHub profile — no posting to GitHub on your behalf.
+                </p>
             </div>
-
-            <label for="repository_url" class="block text-sm font-medium">
-                Repository URL
-            </label>
-            <input
-                id="repository_url"
-                name="repository_url"
-                type="url"
-                required
-                placeholder="https://github.com/owner/plugin-name"
-                value="{{ old('repository_url') }}"
-                class="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-900"
-            >
-
-            @error('repository_url')
-                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-            @enderror
-
-            <button
-                type="submit"
-                class="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-                Submit for review
-            </button>
-
-            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                Submissions are imported from GitHub immediately and stay pending until a maintainer approves them. Logging in with GitHub is required, and rate limiting applies.
-            </p>
-        </form>
+        @endauth
 
         <h2 class="mt-8 text-sm font-semibold">What happens next</h2>
         <ol class="mt-4 space-y-4">

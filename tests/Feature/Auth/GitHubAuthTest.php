@@ -24,10 +24,13 @@ class GitHubAuthTest extends TestCase
         config()->set('services.github.admins', []);
     }
 
-    public function test_guest_is_redirected_to_login_when_opening_the_submit_form(): void
+    public function test_guest_sees_a_sign_in_prompt_instead_of_the_submit_form(): void
     {
         $this->get(route('submit'))
-            ->assertRedirect('/auth/github/redirect');
+            ->assertOk()
+            ->assertSee('Sign in to submit a plugin')
+            ->assertSee(route('auth.github.redirect'), escape: false)
+            ->assertDontSee('name="repository_url"', escape: false);
     }
 
     public function test_guest_is_redirected_to_login_when_posting_a_submission(): void
