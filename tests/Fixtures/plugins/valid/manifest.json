@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "acme.workspace-switcher",
+  "name": "Workspace Switcher",
+  "version": "1.2.0",
+  "author": "Acme Plugins",
+  "description": "Move quickly between named Omarchy workspaces.",
+  "license": "MIT",
+  "kinds": ["service", "bar-widget"],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Widget.qml"
+  }
+}
