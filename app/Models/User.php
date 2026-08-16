@@ -29,4 +29,11 @@ class User extends Authenticatable
     {
         return $this->is_admin === true;
     }
+
+    protected function casts(): array
+    {
+        return [
+            'is_admin' => 'boolean',
+        ];
+    }
 }
