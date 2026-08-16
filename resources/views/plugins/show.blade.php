@@ -9,7 +9,7 @@
                 <img src="{{ $plugin->icon_url }}" alt="" class="h-14 w-14 rounded-lg object-cover">
             @else
                 <span class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-ink dark:bg-black" aria-hidden="true">
-                    <img src="{{ asset('images/omarchy-mark-lime.png') }}" alt="" class="h-7 w-7">
+                    <img src="{{ asset('images/omarchy-mark.png') }}" alt="" class="h-7 w-7">
                 </span>
             @endif
 

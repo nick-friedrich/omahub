@@ -17,7 +17,7 @@
             <img src="{{ $iconUrl }}" alt="" class="h-10 w-10 rounded-md object-cover" loading="lazy">
         @else
             <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-ink dark:bg-black" title="{{ $author }}" aria-hidden="true">
-                <img src="{{ asset('images/omarchy-mark-lime.png') }}" alt="" class="h-5 w-5" loading="lazy">
+                <img src="{{ asset('images/omarchy-mark.png') }}" alt="" class="h-5 w-5" loading="lazy">
             </span>
         @endif
 
