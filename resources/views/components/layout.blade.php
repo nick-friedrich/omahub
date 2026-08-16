@@ -18,11 +18,8 @@
     <body class="min-h-screen bg-[#FDFDFC] text-[#1b1b18] antialiased dark:bg-[#0a0a0a] dark:text-[#EDEDEC]">
         <header class="sticky top-0 z-40 border-b border-gray-200 bg-[#FDFDFC]/90 backdrop-blur dark:border-[#3E3E3A] dark:bg-[#0a0a0a]/90">
             <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-                <a href="{{ route('home') }}" class="flex select-none items-center text-sm font-semibold leading-none tracking-tight" aria-label="Omahub home">
-                    <span class="flex items-center overflow-hidden rounded-md bg-ink text-white dark:bg-black">
-                        <span class="px-2 py-1.5">oma</span>
-                        <span class="bg-omarchy px-2 py-1.5 text-ink">hub</span>
-                    </span>
+                <a href="{{ route('home') }}" class="text-lg font-semibold tracking-tight">
+                    Omahub
                 </a>
 
                 <nav class="flex items-center gap-1 text-sm sm:gap-2">

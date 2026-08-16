@@ -8,8 +8,8 @@
             @if ($plugin->icon_url)
                 <img src="{{ $plugin->icon_url }}" alt="" class="h-14 w-14 rounded-lg object-cover">
             @else
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-ink dark:bg-black" aria-hidden="true">
-                    <img src="{{ asset('images/omarchy-mark.png') }}" alt="" class="h-7 w-7">
+                <span class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-200 text-xl font-semibold dark:bg-gray-800" title="{{ $plugin->author_name ?? $plugin->repository_owner }}">
+                    {{ strtoupper(substr($plugin->author_name ?? $plugin->repository_owner, 0, 1)) }}
                 </span>
             @endif
 
