@@ -12,4 +12,7 @@ Route::get('/plugins', [PluginController::class, 'index'])->name('plugins.index'
 Route::get('/plugins/{plugin:slug}', [PluginController::class, 'show'])->name('plugins.show');
 Route::get('/categories/{category:slug}', [CategoryController::class, 'show'])->name('categories.show');
 Route::get('/search', [SearchController::class, 'index'])->name('search');
-Route::get('/submit', SubmitController::class)->name('submit');
+Route::get('/submit', [SubmitController::class, 'index'])->name('submit');
+Route::post('/submit', [SubmitController::class, 'store'])
+    ->middleware('throttle:submissions')
+    ->name('submit.store');

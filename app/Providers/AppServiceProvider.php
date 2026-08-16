@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Services\Markdown\MarkdownRenderer;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        RateLimiter::for('submissions', function (object $job) {
+            return Limit::perMinute(3)->by($job->ip());
+        });
     }
 }

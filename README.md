@@ -31,13 +31,28 @@ To add development data:
 php artisan db:seed
 ```
 
-Set `GITHUB_TOKEN` in `.env` to raise GitHub's API rate limit, then import or refresh a public plugin repository with:
+Set `GITHUB_TOKEN` in `.env` to raise GitHub's API rate limit, then import or refresh a public plugin repository directly from the command line (admin only):
 
 ```bash
 php artisan plugins:import https://github.com/owner/repository
 ```
 
-The repository must contain a valid Omarchy `manifest.json` at its root. Imports are synchronous and new plugins remain pending until the submission workflow is implemented.
+The repository must contain a valid Omarchy `manifest.json` at its root. Imports are synchronous and new plugins start as pending.
+
+## Submissions
+
+Visitors can submit a plugin by pasting a public GitHub repository URL at `GET /submit`. The site form is rate limited and includes a honeypot for bots. Each submission runs the importer synchronously, records the outcome, and stays **pending** for a maintainer to review — nothing is published automatically.
+
+Review pending submissions as the admin (artisan is the backend interface for maintaining the database):
+
+```bash
+php artisan submissions:list                      # show submissions awaiting review
+php artisan submissions:approve 12                # publish the linked plugin
+php artisan submissions:reject 12 "reason"        # reject and settle the plugin
+php artisan submissions:list --all                # include reviewed/failed submissions
+```
+
+Approving a submission publishes its plugin (sets `status` to `published`); rejecting a pending submission leaves the plugin unpublished (or rejected if it was still pending).
 
 Start the application and asset watcher:
 

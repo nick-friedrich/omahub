@@ -31,6 +31,7 @@ class PluginSubmission extends Model
         ];
     }
 
+    /** @return BelongsTo<Plugin, $this> */
     public function plugin(): BelongsTo
     {
         return $this->belongsTo(Plugin::class);
