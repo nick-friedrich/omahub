@@ -12,3 +12,152 @@
     --color-omarchy: #b4ed21;
     --color-ink: #0a0a0a;
 }
+
+/* highlight.js — syntax highlighting for plugin README code blocks.
+   Only token colours are set; the prose container provides the block
+   background and baseline text colour. */
+pre code.hljs {
+    display: block;
+    overflow-x: auto;
+    background: transparent;
+    color: inherit;
+}
+
+.hljs-comment,
+.hljs-quote {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-template-tag,
+.hljs-meta .hljs-keyword {
+    color: #7c3aed;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-template-variable,
+.hljs-subst {
+    color: #047857;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+    color: #b45309;
+}
+
+.hljs-built_in,
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-attribute,
+.hljs-name {
+    color: #0369a1;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+    color: #0f766e;
+}
+
+.hljs-tag,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-pseudo {
+    color: #a21caf;
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-params {
+    color: #b91c1c;
+}
+
+.hljs-meta,
+.hljs-addition {
+    color: #4b5563;
+}
+
+.hljs-deletion {
+    color: #dc2626;
+}
+
+.hljs-emphasis {
+    font-style: italic;
+}
+
+.hljs-strong {
+    font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+    .hljs-comment,
+    .hljs-quote {
+        color: #64748b;
+    }
+
+    .hljs-keyword,
+    .hljs-selector-tag,
+    .hljs-doctag,
+    .hljs-template-tag,
+    .hljs-meta .hljs-keyword {
+        color: #c4b5fd;
+    }
+
+    .hljs-string,
+    .hljs-regexp,
+    .hljs-template-variable,
+    .hljs-subst {
+        color: #6ee7b7;
+    }
+
+    .hljs-number,
+    .hljs-literal,
+    .hljs-symbol,
+    .hljs-bullet,
+    .hljs-link {
+        color: #fcd34d;
+    }
+
+    .hljs-built_in,
+    .hljs-type,
+    .hljs-class .hljs-title,
+    .hljs-attribute,
+    .hljs-name {
+        color: #7dd3fc;
+    }
+
+    .hljs-title,
+    .hljs-title.function_,
+    .hljs-section {
+        color: #2dd4bf;
+    }
+
+    .hljs-tag,
+    .hljs-selector-id,
+    .hljs-selector-class,
+    .hljs-selector-pseudo {
+        color: #e879f9;
+    }
+
+    .hljs-attr,
+    .hljs-variable,
+    .hljs-params {
+        color: #fda4af;
+    }
+
+    .hljs-meta,
+    .hljs-addition {
+        color: #94a3b8;
+    }
+
+    .hljs-deletion {
+        color: #f87171;
+    }
+}
