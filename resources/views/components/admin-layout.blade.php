@@ -22,7 +22,7 @@
             <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <a href="{{ route('admin.dashboard') }}" class="flex shrink-0 items-center" aria-label="Omahub home">
-                        <img src="{{ asset('logo_omahub.png') }}" alt="Omahub" class="h-7 w-auto sm:h-8 dark:invert">
+                        <img src="{{ asset('logo_omahub.png') }}" alt="Omahub" class="h-7 w-auto sm:h-8">
                     </a>
                     <span class="rounded-md bg-gray-900 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white dark:bg-white dark:text-gray-900">Admin</span>
                 </div>
