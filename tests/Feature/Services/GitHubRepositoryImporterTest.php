@@ -4,6 +4,7 @@ namespace Tests\Feature\Services;
 
 use App\Enums\PluginStatus;
 use App\Exceptions\ManifestValidationException;
+use App\Models\Plugin;
 use App\Services\Plugins\GitHubRepositoryImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
@@ -67,16 +68,56 @@ class GitHubRepositoryImporterTest extends TestCase
         }
     }
 
+    public function test_a_moved_repository_updates_the_existing_plugin_instead_of_duplicating_it(): void
+    {
+        $this->fakeGitHub(sha: str_repeat('a', 40));
+        $original = app(GitHubRepositoryImporter::class)->import('https://github.com/acme/workspace-switcher');
+
+        // The repository has since been renamed: GitHub redirects acme -> newowner.
+        $this->fakeGitHub(sha: str_repeat('b', 40), redirectedOwner: 'newowner');
+        $updated = app(GitHubRepositoryImporter::class)->import('https://github.com/acme/workspace-switcher');
+
+        $this->assertSame($original->id, $updated->id);
+        $this->assertSame('newowner', $updated->repository_owner);
+        $this->assertSame('workspace-switcher', $updated->repository_name);
+        $this->assertDatabaseCount('plugins', 1);
+    }
+
+    public function test_a_duplicate_manifest_id_gets_a_unique_slug_instead_of_colliding(): void
+    {
+        Plugin::factory()->create([
+            'slug' => 'acme.workspace-switcher',
+            'repository_owner' => 'dillanmateushkl',
+            'repository_name' => 'multi-monitor-workspaces',
+        ]);
+
+        $this->fakeGitHub();
+        $plugin = app(GitHubRepositoryImporter::class)->import('https://github.com/acme/workspace-switcher');
+
+        $this->assertSame('acme.workspace-switcher-2', $plugin->slug);
+        $this->assertDatabaseCount('plugins', 2);
+    }
+
     private function fakeGitHub(
         int $stars = 42,
         string $sha = 'abc123',
         ?string $manifest = null,
+        ?string $redirectedOwner = null,
     ): void {
         $manifest ??= file_get_contents(base_path('tests/Fixtures/plugins/valid/manifest.json'));
 
         Http::swap(new Factory);
-        Http::fake(function (Request $request) use ($stars, $sha, $manifest) {
+        Http::fake(function (Request $request) use ($stars, $sha, $manifest, $redirectedOwner) {
             $path = parse_url($request->url(), PHP_URL_PATH);
+
+            // After a redirect the importer addresses the canonical owner path.
+            if ($redirectedOwner !== null) {
+                $path = preg_replace(
+                    '#^/repos/newowner/workspace-switcher#',
+                    '/repos/acme/workspace-switcher',
+                    $path,
+                ) ?? $path;
+            }
 
             return match ($path) {
                 '/repos/acme/workspace-switcher' => Http::response([
@@ -92,7 +133,7 @@ class GitHubRepositoryImporterTest extends TestCase
                     'pushed_at' => '2026-08-15T12:00:00Z',
                     'license' => ['spdx_id' => 'MIT'],
                     'owner' => [
-                        'login' => 'Acme',
+                        'login' => $redirectedOwner ?? 'Acme',
                         'html_url' => 'https://github.com/Acme',
                     ],
                 ]),

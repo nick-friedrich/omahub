@@ -39,6 +39,19 @@ php artisan plugins:import https://github.com/owner/repository
 
 The repository must contain a valid Omarchy `manifest.json` at its root. Imports are synchronous and new plugins start as pending.
 
+To re-visit and update plugins already in the registry (refreshing GitHub metadata and fetching READMEs), run:
+
+```bash
+php artisan plugins:refresh                 # refresh every plugin
+php artisan plugins:refresh --missing-readme # only plugins without a README
+php artisan plugins:refresh --ids=1,2,3     # refresh specific plugins
+php artisan plugins:refresh --after=108     # resume a stopped run from plugin ID 108
+php artisan plugins:refresh --limit=50      # cap the number refreshed
+php artisan plugins:refresh --dry-run       # list targets without calling GitHub
+```
+
+Refresh is idempotent: re-importing a repository updates the existing plugin in place and preserves its status. If a repository has moved, the existing row is updated to its new owner/name instead of creating a duplicate. Failures (repos without a root `manifest.json`, or moved or deleted repositories) are reported per plugin and the run continues; only a GitHub API rate limit stops the run early, with the resume command printed. The importer fetches the README from the repository's default branch. Set `GITHUB_TOKEN` in `.env` (e.g. `echo "GITHUB_TOKEN=$(gh auth token)" >> .env`) to avoid the unauthenticated rate limit when refreshing many plugins at once.
+
 ## Submissions
 
 Visitors can submit a plugin by pasting a public GitHub repository URL at `GET /submit`. The site form is rate limited and includes a honeypot for bots. Each submission runs the importer synchronously, records the outcome, and stays **pending** for a maintainer to review — nothing is published automatically.

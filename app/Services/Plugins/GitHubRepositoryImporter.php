@@ -39,8 +39,7 @@ class GitHubRepositoryImporter
         $readme = $this->github->readme($repository, $defaultBranch);
         $commit = $this->github->headCommit($repository, $defaultBranch);
         $latestVersion = $this->github->latestVersion($repository) ?? $manifest['version'];
-        $upstreamLicense = $this->github->licenseIdentifier($repository);
-        $license = $this->license($manifest, $repositoryData, $upstreamLicense);
+        $license = $this->license($manifest, $repositoryData);
         $commitSha = $commit['sha'] ?? null;
 
         if (! is_string($commitSha) || $commitSha === '') {
@@ -48,6 +47,7 @@ class GitHubRepositoryImporter
         }
 
         return DB::transaction(function () use (
+            $requestedRepository,
             $repository,
             $repositoryData,
             $manifest,
@@ -58,13 +58,28 @@ class GitHubRepositoryImporter
             $license,
         ): Plugin {
             $plugin = Plugin::query()->firstOrNew([
-                'repository_owner' => $repository->owner,
-                'repository_name' => $repository->name,
+                'repository_owner' => $requestedRepository->owner,
+                'repository_name' => $requestedRepository->name,
             ]);
 
             if (! $plugin->exists) {
-                $plugin->slug = strtolower($manifest['id']);
-                $plugin->status = PluginStatus::Pending;
+                // The repository may have moved (GitHub redirects). When another
+                // row already tracks the canonical owner/name, refresh that row
+                // instead of creating a duplicate for the same plugin.
+                $canonical = Plugin::query()
+                    ->where('repository_owner', $repository->owner)
+                    ->where('repository_name', $repository->name)
+                    ->first();
+
+                if ($canonical !== null) {
+                    $plugin = $canonical;
+                } else {
+                    // Distinct repositories can share a manifest id (forks,
+                    // copies); keep slugs unique so one bad match cannot
+                    // break the whole refresh.
+                    $plugin->slug = $this->uniqueSlug(strtolower($manifest['id']));
+                    $plugin->status = PluginStatus::Pending;
+                }
             }
 
             $plugin->fill([
@@ -117,6 +132,19 @@ class GitHubRepositoryImporter
         }
     }
 
+    private function uniqueSlug(string $base): string
+    {
+        $candidate = $base;
+        $suffix = 2;
+
+        while (Plugin::query()->where('slug', $candidate)->exists()) {
+            $candidate = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
     /** @param array<string, mixed> $repositoryData */
     private function repositoryFromResponse(array $repositoryData): GitHubRepository
     {
@@ -133,7 +161,7 @@ class GitHubRepositoryImporter
     /** @param array<string, mixed> $manifest
      * @param  array<string, mixed>  $repositoryData
      */
-    private function license(array $manifest, array $repositoryData, ?string $upstreamLicense): ?string
+    private function license(array $manifest, array $repositoryData): ?string
     {
         $manifestLicense = $this->optionalString($manifest['license'] ?? null);
         $repositoryLicense = $this->optionalString($repositoryData['license']['spdx_id'] ?? null);
@@ -142,7 +170,7 @@ class GitHubRepositoryImporter
             $repositoryLicense = null;
         }
 
-        return $manifestLicense ?? $repositoryLicense ?? $upstreamLicense;
+        return $manifestLicense ?? $repositoryLicense;
     }
 
     private function optionalString(mixed $value): ?string

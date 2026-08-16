@@ -22,14 +22,16 @@ trait FakesGitHub
         string $sha = 'abc123',
         ?string $manifest = null,
         array $routes = [],
+        ?string $redirectedOwner = null,
     ): void {
         $manifest ??= file_get_contents(base_path('tests/Fixtures/plugins/valid/manifest.json'));
         $base = "/repos/{$owner}/{$name}";
+        $ownerLogin = $redirectedOwner ?? $owner;
 
         $defaults = [
             $base => Http::response([
                 'name' => $name,
-                'html_url' => "https://github.com/{$owner}/{$name}",
+                'html_url' => "https://github.com/{$ownerLogin}/{$name}",
                 'description' => 'A workspace utility.',
                 'homepage' => 'https://example.com/workspace-switcher',
                 'default_branch' => 'main',
@@ -40,8 +42,8 @@ trait FakesGitHub
                 'pushed_at' => '2026-08-15T12:00:00Z',
                 'license' => ['spdx_id' => 'MIT'],
                 'owner' => [
-                    'login' => $owner,
-                    'html_url' => "https://github.com/{$owner}",
+                    'login' => $ownerLogin,
+                    'html_url' => "https://github.com/{$ownerLogin}",
                 ],
             ]),
             "{$base}/contents/manifest.json" => Http::response($manifest, 200, ['Content-Type' => 'application/json']),

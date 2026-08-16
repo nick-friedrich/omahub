@@ -91,20 +91,6 @@ class GitHubClient
         return $tags->json('0.name');
     }
 
-    public function licenseIdentifier(GitHubRepository $repository): ?string
-    {
-        $response = $this->get("repos/{$repository->owner}/{$repository->name}/license");
-
-        if ($response->notFound()) {
-            return null;
-        }
-
-        $this->ensureSuccessful($response);
-        $identifier = $response->json('license.spdx_id');
-
-        return is_string($identifier) && $identifier !== 'NOASSERTION' ? $identifier : null;
-    }
-
     private function rawFile(GitHubRepository $repository, string $path, string $branch): ?string
     {
         $response = $this->get(
