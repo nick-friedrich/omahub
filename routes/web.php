@@ -18,6 +18,8 @@ Route::get('/plugins/{plugin:slug}', [PluginController::class, 'show'])->name('p
 Route::get('/categories/{category:slug}', [CategoryController::class, 'show'])->name('categories.show');
 Route::get('/search', [SearchController::class, 'index'])->name('search');
 Route::get('/resources', ResourcesController::class)->name('resources.index');
+Route::view('/privacy', 'privacy')->name('privacy');
+Route::view('/impressum', 'impressum')->name('impressum');
 
 // GitHub OAuth sign-in.
 Route::get('/auth/github/redirect', [GitHubAuthController::class, 'redirect'])->name('auth.github.redirect');
