@@ -81,6 +81,9 @@
                 <a href="{{ route('plugins.index') }}" class="hover:text-gray-700 dark:hover:text-gray-200">Omahub</a>
                 — a community registry for Omarchy plugins.
             </p>
+            <p class="mt-2">
+                <a href="https://github.com/nick-friedrich/omahub" target="_blank" rel="noopener noreferrer" class="hover:text-gray-700 dark:hover:text-gray-200">GitHub</a>
+            </p>
         </footer>
     </body>
 </html>
