@@ -15,14 +15,14 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-        <link rel="icon" type="image/png" href="{{ asset('omahub_logo_square.png') }}">
+        <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     </head>
     <body class="min-h-screen bg-[#FDFDFC] text-[#1b1b18] antialiased dark:bg-[#0a0a0a] dark:text-[#EDEDEC]">
         <header class="sticky top-0 z-40 border-b border-gray-200 bg-[#FDFDFC]/90 backdrop-blur dark:border-[#3E3E3A] dark:bg-[#0a0a0a]/90">
             <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <a href="{{ route('admin.dashboard') }}" class="flex shrink-0 items-center" aria-label="Omahub home">
-                        <img src="{{ asset('logo_omahub.png') }}" alt="Omahub" class="h-9 w-auto sm:h-10">
+                        <img src="{{ asset('wordmark.png') }}" alt="Omahub" class="h-9 w-auto sm:h-10">
                     </a>
                     <span class="rounded-md bg-gray-900 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white dark:bg-white dark:text-gray-900">Admin</span>
                 </div>
