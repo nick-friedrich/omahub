@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class SecurityFinding extends Model
 {
+    /** @return BelongsTo<SecurityScan, $this> */
     public function scan(): BelongsTo
     {
         return $this->belongsTo(SecurityScan::class, 'security_scan_id');

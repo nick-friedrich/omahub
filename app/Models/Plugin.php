@@ -89,21 +89,25 @@ class Plugin extends Model
         return $line !== null && $line > 0 ? $url.'#L'.$line : $url;
     }
 
+    /** @return BelongsToMany<Category, $this> */
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class);
     }
 
+    /** @return BelongsToMany<Tag, $this> */
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class);
     }
 
+    /** @return HasMany<PluginSubmission, $this> */
     public function submissions(): HasMany
     {
         return $this->hasMany(PluginSubmission::class);
     }
 
+    /** @return HasMany<SecurityScan, $this> */
     public function securityScans(): HasMany
     {
         return $this->hasMany(SecurityScan::class);
@@ -111,6 +115,8 @@ class Plugin extends Model
 
     /**
      * The most recently created security scan for this plugin.
+     *
+     * @return HasOne<SecurityScan, $this>
      */
     public function latestSecurityScan(): HasOne
     {
