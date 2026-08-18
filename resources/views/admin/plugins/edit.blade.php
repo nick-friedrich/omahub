@@ -125,7 +125,7 @@
                                         @else
                                             <span class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $finding->severity }}</span>
                                         @endif
-                                        <span class="rounded-md bg-gray-900/5 px-1.5 py-0.5 font-mono text-[11px] font-medium text-gray-800 dark:bg-white/10 dark:text-gray-100">{{ $finding->rule }}</span>
+                                        <span class="rounded-md bg-white/70 px-1.5 py-0.5 font-mono text-xs font-semibold text-[#1b1b18] dark:bg-white/10 dark:text-[#EDEDEC]">{{ $finding->rule }}</span>
                                         <a
                                             href="{{ $plugin->githubBlobUrl($finding->repositoryPath(), $latestScan->commit_sha, $finding->line) }}"
                                             target="_blank"
