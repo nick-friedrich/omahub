@@ -3,8 +3,10 @@
 namespace Tests\Feature\Admin;
 
 use App\Enums\PluginStatus;
+use App\Enums\SecurityScanStatus;
 use App\Models\Category;
 use App\Models\Plugin;
+use App\Models\SecurityScan;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -104,5 +106,94 @@ class AdminPluginControllerTest extends TestCase
             ->assertRedirect(route('admin.plugins.index'));
 
         $this->assertDatabaseMissing('plugins', ['id' => $plugin->id]);
+    }
+
+    public function test_index_search_matches_name_owner_and_repository(): void
+    {
+        $lunar = Plugin::factory()->create([
+            'name' => 'Lunar Wobble',
+            'repository_owner' => 'moon-unit',
+            'repository_name' => 'lunar-wobble',
+        ]);
+        $nova = Plugin::factory()->create([
+            'name' => 'Nova Flare',
+            'repository_owner' => 'star-fleet',
+            'repository_name' => 'nova-flare',
+        ]);
+
+        $this->get(route('admin.plugins.index', ['q' => 'moon-unit']))
+            ->assertOk()
+            ->assertSee($lunar->name)
+            ->assertDontSee($nova->name);
+
+        $this->get(route('admin.plugins.index', ['q' => 'nova']))
+            ->assertOk()
+            ->assertSee($nova->name)
+            ->assertDontSee($lunar->name);
+    }
+
+    public function test_index_shows_latest_scan_risk_level_in_table(): void
+    {
+        $risky = Plugin::factory()->create(['name' => 'Zulu Risky Plugin', 'repository_name' => 'risky-repo']);
+        $this->createSucceededScan($risky, 'high');
+
+        $clear = Plugin::factory()->create(['name' => 'Alpha Safe Plugin', 'repository_name' => 'safe-repo']);
+        $this->createSucceededScan($clear, 'none');
+
+        $unscanned = Plugin::factory()->create(['name' => 'Beta Unscanned Plugin', 'repository_name' => 'unscanned-repo']);
+
+        $this->get(route('admin.plugins.index'))
+            ->assertOk()
+            ->assertSeeInOrder([$risky->name, 'risky-repo', 'High'])
+            ->assertSeeInOrder([$clear->name, 'safe-repo', 'None'])
+            ->assertSeeInOrder([$unscanned->name, 'unscanned-repo', 'Not scanned']);
+    }
+
+    public function test_index_uses_the_latest_scan_for_risk(): void
+    {
+        $plugin = Plugin::factory()->create(['name' => 'Evolving Beast']);
+
+        $this->createSucceededScan($plugin, 'low', commit: 'aaaa1111');
+        $this->createSucceededScan($plugin, 'critical', commit: 'bbbb2222');
+
+        $this->get(route('admin.plugins.index'))
+            ->assertOk()
+            ->assertSeeInOrder([$plugin->name, 'Critical']);
+    }
+
+    public function test_index_filters_plugins_by_latest_scan_risk(): void
+    {
+        $high = Plugin::factory()->create(['name' => 'High Voltage']);
+        $this->createSucceededScan($high, 'high');
+
+        $clear = Plugin::factory()->create(['name' => 'Clear Water']);
+        $this->createSucceededScan($clear, 'none');
+
+        $unscanned = Plugin::factory()->create(['name' => 'Untouched Plane']);
+
+        $this->get(route('admin.plugins.index', ['risk' => 'high']))
+            ->assertOk()
+            ->assertSee($high->name)
+            ->assertDontSee($clear->name)
+            ->assertDontSee($unscanned->name);
+
+        $this->get(route('admin.plugins.index', ['risk' => 'unscanned']))
+            ->assertOk()
+            ->assertSee($unscanned->name)
+            ->assertDontSee($high->name)
+            ->assertDontSee($clear->name);
+    }
+
+    private function createSucceededScan(Plugin $plugin, string $riskLevel, string $commit = 'deadbeef'): SecurityScan
+    {
+        return SecurityScan::query()->create([
+            'plugin_id' => $plugin->id,
+            'commit_sha' => $commit,
+            'status' => SecurityScanStatus::Succeeded,
+            'risk_level' => $riskLevel,
+            'rules_run' => ['sudo'],
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+        ]);
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'slug',
@@ -106,5 +107,13 @@ class Plugin extends Model
     public function securityScans(): HasMany
     {
         return $this->hasMany(SecurityScan::class);
+    }
+
+    /**
+     * The most recently created security scan for this plugin.
+     */
+    public function latestSecurityScan(): HasOne
+    {
+        return $this->hasOne(SecurityScan::class)->latestOfMany();
     }
 }
