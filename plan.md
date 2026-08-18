@@ -468,8 +468,11 @@ parsed structured `output`, and the `raw_response`, keyed to the same `(plugin_i
   php artisan plugins:scan --dry-run
   ```
 
-- Config: `SCAN_SANDBOX_IMAGE`, `SCAN_SANDBOX_ENABLED` (when disabled, scan runs directly
-  for local dev / tests), codeload URL.
+- Config: `SCAN_SANDBOX_IMAGE` (a **local** image tag built on the server — never a
+  registry image, see Production deployment concern), `SCAN_SANDBOX_HOST_REPO_PATH`
+  (host path of this repo when the app runs in Docker, see Production deployment
+  concern), `SCAN_SANDBOX_ENABLED` (when disabled, scan runs directly for local dev /
+  tests), codeload URL.
 
 ## Stage 2 — AI review (deferred until deterministic is proven)
 
@@ -508,6 +511,34 @@ The app runs in `reverse-proxy-fpm-1` (repo bind-mounted). Launching sandbox con
 requires Docker access from the app — either mount `/var/run/docker.sock` into that
 container or run the scanner as a separate worker container. Decide this before
 deploying scans to production.
+
+**Sandbox image: built on the server, never pushed to a registry.** There is no
+`ghcr.io`/Docker Hub image for the scanner — that was tried and the tag does not exist
+(`manifest unknown`), and we don't want to publish one. `scripts/deploy.sh` preflights
+the sandbox on every deploy (docker CLI in the app container, host daemon reachable,
+image present) and builds or picks the image itself:
+
+1. **Reuse the app's own runtime image already on the server** (default). The sandbox
+   only needs PHP plus the extensions the scan uses (`PharData`, `zlib`, …); the repo is
+   bind-mounted read-only, so the application code comes from the mount and stays in
+   sync with the host automatically. `deploy.sh` derives it from the fpm container's own
+   image — no Dockerfile at all.
+2. **Only if the scan needs a different runtime:** keep a dedicated `Dockerfile` **on the
+   server only, outside the repo** (default path `/opt/omahub-scan/Dockerfile` — never
+   committed, never pushed). `deploy.sh` builds it there (`docker build -t omahub-scan .`)
+   when the file exists and points the app at the local tag. Rebuild on the server
+   whenever the runtime changes.
+
+**App-in-Docker path mapping (Docker-out-of-Docker).** The app runs inside
+`reverse-proxy-fpm-1` and launches sandbox containers through a mounted
+`/var/run/docker.sock`. The sandbox `-v` source is resolved by the **host** daemon, so
+when the app is containerised, set `SCAN_SANDBOX_HOST_REPO_PATH` to the host path of
+this repo (e.g. `/opt/omahub`). When PHP runs on the host (local dev), leave it unset —
+`base_path()` is already a host path.
+
+**Migrations run on deploy.** `scripts/deploy.sh` runs `artisan migrate --force` on every
+deploy, so new migrations (e.g. `security_scans` / `security_findings`) reach production
+without manual steps.
 
 ## Testing
 

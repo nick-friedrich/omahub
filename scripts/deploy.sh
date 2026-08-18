@@ -8,16 +8,23 @@
 # Vite emits content-hashed asset filenames that bust browser caches on their own.
 #
 # Steps:
-#   1. Preflight: clean working tree, fpm container running
+#   1. Preflight: clean working tree, fpm container running, sandbox scan ready
 #   2. git fetch + git pull --ff-only
 #   3. composer install  (only if composer.lock changed; via container — host has no php)
 #   4. npm ci            (only if package-lock.json changed)
 #   5. npm run build     (always — Tailwind utilities like new h-*/w-* classes only
 #                         exist in the production CSS once rebuilt; skipping this is
 #                         the classic "deployed but styles missing" trap)
-#   6. Refresh Laravel caches inside the fpm container: view:clear, cache:clear, config:cache
+#   6. Refresh Laravel caches inside the fpm container: migrate --force, view:clear,
+#      cache:clear, config:cache
 #   7. Smoke test: homepage HTTP 200 AND served HTML references the freshly built
 #      CSS asset (catches stale proxy/CDN/opcache serving old assets)
+#
+# The deterministic security scan (DockerSandboxRunner) launches `docker run` from
+# inside the fpm container, so step 1 also preflights the sandbox: docker CLI present
+# in the container, host daemon reachable (docker.sock), and the sandbox image built
+# or picked. The image is never pulled from a registry — see the sandbox_ready()
+# function below.
 #
 # Usage:
 #   ./scripts/deploy.sh            # normal deploy
@@ -27,6 +34,11 @@
 #   FPM_CONTAINER  php-fpm container mounting this repo (default: reverse-proxy-fpm-1)
 #   FPM_APP_PATH   repo mount path inside the container (default: /srv/omahub)
 #   APP_URL        base URL smoke-tested after deploy (default: https://omahub.dev)
+#   SANDBOX_IMAGE  sandbox image tag for security scans (default: the fpm container's
+#                  own image, or omahub-scan:latest when SANDBOX_DOCKERFILE exists)
+#   SANDBOX_DOCKERFILE  server-local Dockerfile the sandbox image is built from
+#                  (default: /opt/omahub-scan/Dockerfile — outside the repo, never
+#                  committed or pushed to a registry)
 
 set -euo pipefail
 
@@ -37,6 +49,8 @@ cd "$REPO_ROOT"
 FPM_CONTAINER="${FPM_CONTAINER:-reverse-proxy-fpm-1}"
 FPM_APP_PATH="${FPM_APP_PATH:-/srv/omahub}"
 APP_URL="${APP_URL:-https://omahub.dev}"
+SANDBOX_IMAGE="${SANDBOX_IMAGE:-}"
+SANDBOX_DOCKERFILE="${SANDBOX_DOCKERFILE:-/opt/omahub-scan/Dockerfile}"
 FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
@@ -46,6 +60,33 @@ BRANCH="$(git branch --show-current)"
 fail() { echo "✗ $*" >&2; exit 1; }
 say()  { echo "· $*"; }
 
+# --- sandbox preflight helpers ------------------------------------------------
+# True when the app's own .env does not explicitly disable the sandbox (the app
+# default is enabled outside the testing env).
+sandbox_enabled() {
+  local val
+  val="$(grep -E '^SCAN_SANDBOX_ENABLED=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"' | tr '[:upper:]' '[:lower:]')"
+  [[ "$val" != "false" ]]
+}
+
+# Ensure a usable sandbox image and record it in SANDBOX_IMAGE (host daemon).
+sandbox_ready() {
+  if [[ -n "$SANDBOX_IMAGE" ]]; then
+    return 0 # caller overrode the image
+  fi
+  if [[ -f "$SANDBOX_DOCKERFILE" ]]; then
+    say "Building sandbox image from $SANDBOX_DOCKERFILE"
+    docker build -q -t omahub-scan:latest -f "$SANDBOX_DOCKERFILE" "$(dirname "$SANDBOX_DOCKERFILE")" >/dev/null
+    SANDBOX_IMAGE=omahub-scan:latest
+    return 0
+  fi
+  # No server-local Dockerfile → reuse the app's own runtime image: it already has
+  # the PHP runtime the shared scan code needs, and the repo bind-mount keeps the
+  # sandbox and app code in sync (see agents.md).
+  SANDBOX_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$FPM_CONTAINER")"
+  say "No $SANDBOX_DOCKERFILE — reusing app runtime image '$SANDBOX_IMAGE' as sandbox"
+}
+
 # --- 1. preflight -----------------------------------------------------------
 say "Deploying omahub (branch: $BRANCH)"
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -53,6 +94,32 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 if ! docker ps --format '{{.Names}}' | grep -qx "$FPM_CONTAINER"; then
   fail "Container '$FPM_CONTAINER' is not running."
+fi
+
+# --- 1b. security-scan sandbox preflight -------------------------------------
+# The deterministic scan launches `docker run` from inside the fpm container, so
+# the container needs the docker CLI and a reachable host daemon (docker.sock), and
+# the sandbox image must exist on the host daemon. Skipped when the sandbox is
+# explicitly disabled in .env.
+if sandbox_enabled; then
+  say "Sandbox scan is enabled — preflighting sandbox"
+  docker exec "$FPM_CONTAINER" sh -c 'command -v docker' >/dev/null 2>&1 \
+    || fail "No 'docker' CLI inside '$FPM_CONTAINER'. Install docker-cli in the image and mount /var/run/docker.sock (see agents.md)."
+  docker exec "$FPM_CONTAINER" docker version --format '{{.Server.Version}}' >/dev/null 2>&1 \
+    || fail "Docker daemon unreachable from '$FPM_CONTAINER'. Mount /var/run/docker.sock into it (see agents.md)."
+
+  sandbox_ready
+
+  docker image inspect "$SANDBOX_IMAGE" >/dev/null 2>&1 \
+    || fail "Sandbox image '$SANDBOX_IMAGE' is not available on the host daemon. Set SANDBOX_IMAGE, or place a Dockerfile at $SANDBOX_DOCKERFILE."
+  say "Sandbox image: $SANDBOX_IMAGE"
+
+  env_img="$(grep -E '^SCAN_SANDBOX_IMAGE=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"' || true)"
+  if [[ -n "$env_img" && "$env_img" != "$SANDBOX_IMAGE" ]]; then
+    say "note: .env sets SCAN_SANDBOX_IMAGE=$env_img but deploy uses $SANDBOX_IMAGE — update .env (then re-run config:cache) so the app scans with the right image."
+  fi
+else
+  say "SCAN_SANDBOX_ENABLED=false — skipping sandbox preflight"
 fi
 
 # --- 2. pull ----------------------------------------------------------------
@@ -106,6 +173,7 @@ npm run build
 
 # --- 6. refresh Laravel caches in the container -------------------------------
 say "Refreshing Laravel caches in '$FPM_CONTAINER'"
+"${ARTISAN[@]}" migrate --force
 "${ARTISAN[@]}" view:clear
 "${ARTISAN[@]}" cache:clear
 "${ARTISAN[@]}" config:cache

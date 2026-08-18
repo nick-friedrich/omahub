@@ -60,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
                 return new DockerSandboxRunner(
                     image: (string) config('security_scan.sandbox_image'),
                     containerRepoPath: (string) config('security_scan.sandbox_repo_path'),
+                    hostRepoPath: config('security_scan.sandbox_host_repo_path'),
                 );
             }
 

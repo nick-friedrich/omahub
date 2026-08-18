@@ -67,18 +67,26 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
 - **The security scan needs Docker from inside the app container.** The deterministic
   scan (`php artisan plugins:scan`, or the "Security review" button in the admin) runs
   untrusted repository content inside a disposable Docker sandbox
-  (`DockerSandboxRunner`). For that to work, the app container must be able to reach the
-  Docker daemon:
+  (`DockerSandboxRunner`). For that to work, the app container must have the `docker`
+  CLI installed and be able to reach the Docker daemon:
   - the simplest option is to mount `/var/run/docker.sock:/var/run/docker.sock` into
     `reverse-proxy-fpm-1` (a Docker-out-of-Docker setup); or
   - run scans from a separate worker that already has Docker access.
   Without this, scan commands fail at container launch. In local/dev, set
   `SCAN_SANDBOX_ENABLED=false` to scan in-process instead (no Docker needed).
+  `scripts/deploy.sh` preflights all of this on every deploy and fails with a clear
+  message when something is missing.
 - **The sandbox image must provide the application's runtime.** `DockerSandboxRunner`
   runs `php artisan scan:execute` inside the container with this repo bind-mounted
   read-only. Reuse the app's own php-fpm image (or one with the same runtime/autoload)
-  so the sandbox runs the exact same rule code as the host. Configure it via
+  so the sandbox runs the exact same rule code as the host. There is **no registry
+  image** — `deploy.sh` derives the image from the fpm container, or builds
+  `/opt/omahub-scan/Dockerfile` if that file exists on the server. Configure via
   `SCAN_SANDBOX_IMAGE` (`config/security_scan.php`).
+- **App-in-Docker path mapping.** When the app runs in a container and talks to the host
+  daemon, the sandbox `-v` source is resolved by the host daemon, so it must be a host
+  path. Set `SCAN_SANDBOX_HOST_REPO_PATH` to the host path of this repo; leave it unset
+  when PHP runs directly on the host (local dev).
 - **Keep `main` in sync with origin.** If you commit an ops change (like this doc or
   the deploy script) on the prod box, `git push origin main` so the next ff-pull
   doesn't "diverge". `git pull --ff-only` will refuse on a real divergence — don't

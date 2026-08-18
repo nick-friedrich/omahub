@@ -18,11 +18,21 @@ final class DockerSandboxRunner implements SandboxRunner
     public function __construct(
         private readonly string $image,
         private readonly string $containerRepoPath,
+        private readonly ?string $hostRepoPath = null,
     ) {}
 
     public function scan(GitHubRepository $repository, string $sha, string $tarball): ScanResult
     {
-        $hostRepo = rtrim(base_path(), '/');
+        if ($this->image === '') {
+            throw new RuntimeException(
+                'No sandbox image configured — set SCAN_SANDBOX_IMAGE to a local image tag (see agents.md).',
+            );
+        }
+
+        // The -v source is resolved by the Docker daemon. When the app itself runs
+        // inside a container (Docker-out-of-Docker), base_path() is a container path;
+        // SCAN_SANDBOX_HOST_REPO_PATH must then hold the host path of this repo.
+        $hostRepo = rtrim($this->hostRepoPath ?? base_path(), '/');
         $containerRepo = rtrim($this->containerRepoPath, '/');
         $mount = "{$hostRepo}:{$containerRepo}:ro";
 
