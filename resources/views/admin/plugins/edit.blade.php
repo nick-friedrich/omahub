@@ -100,10 +100,10 @@
                     @php
                         $risk = $latestScan->risk_level ?? 'none';
                         $riskColor = match ($risk) {
-                            'critical', 'high' => 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
-                            'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
-                            'low' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200',
-                            default => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
+                            'critical', 'high' => 'bg-red-600 text-white dark:bg-red-500 dark:text-white',
+                            'medium' => 'bg-amber-500 text-[#1b1b18] dark:bg-amber-400 dark:text-[#1b1b18]',
+                            'low' => 'bg-yellow-500 text-[#1b1b18] dark:bg-yellow-400 dark:text-[#1b1b18]',
+                            default => 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white',
                         };
                     @endphp
 
