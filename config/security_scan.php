@@ -20,8 +20,10 @@ return [
     // Host-side path of this repo when the app runs inside a container and talks to
     // the host Docker daemon (Docker-out-of-Docker). The sandbox -v source is resolved
     // by the host daemon, so it must be a host path. Leave unset when PHP runs on the
-    // host (local dev), where base_path() is already a host path.
-    'sandbox_host_repo_path' => env('SCAN_SANDBOX_HOST_REPO_PATH'),
+    // host (local dev), where base_path() is already a host path. An empty env value
+    // is treated as unset (?: null) — Laravel's env() returns '' for a blank var, and
+    // DockerSandboxRunner only falls back to base_path() on a true null.
+    'sandbox_host_repo_path' => env('SCAN_SANDBOX_HOST_REPO_PATH') ?: null,
     'max_file_size' => (int) env('SCAN_MAX_FILE_SIZE', 2 * 1024 * 1024),
     'max_files' => (int) env('SCAN_MAX_FILES', 2000),
 
