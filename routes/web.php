@@ -48,6 +48,7 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::get('/plugins/{plugin}/edit', [AdminPluginController::class, 'edit'])->name('plugins.edit');
     Route::put('/plugins/{plugin}', [AdminPluginController::class, 'update'])->name('plugins.update');
     Route::post('/plugins/{plugin}/refresh', [AdminPluginController::class, 'refresh'])->name('plugins.refresh');
+    Route::post('/plugins/{plugin}/scan', [AdminPluginController::class, 'scan'])->name('plugins.scan');
     Route::post('/plugins/{plugin}/status', [AdminPluginController::class, 'status'])->name('plugins.status');
     Route::delete('/plugins/{plugin}', [AdminPluginController::class, 'destroy'])->name('plugins.destroy');
 });

@@ -77,6 +77,67 @@
                     <button type="submit" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-900">Refresh</button>
                 </div>
             </form>
+
+            <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm dark:border-gray-800 dark:bg-[#161615]">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-semibold">Security review</h2>
+                        <p class="mt-1 text-xs text-gray-500">Deterministic, rule-based scan of the repository at its current commit.</p>
+                    </div>
+                    <form method="POST" action="{{ route('admin.plugins.scan', $plugin) }}">
+                        @csrf
+                        <button type="submit" class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700">
+                            @if ($latestScan) Rescan @else Run scan @endif
+                        </button>
+                    </form>
+                </div>
+
+                @if (!$latestScan)
+                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                        Not yet scanned. Run a scan to check this repository for potentially dangerous behavior.
+                    </p>
+                @else
+                    @php
+                        $risk = $latestScan->risk_level ?? 'none';
+                        $riskColor = match ($risk) {
+                            'critical', 'high' => 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
+                            'medium' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
+                            'low' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200',
+                            default => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
+                        };
+                    @endphp
+
+                    <dl class="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Risk</dt><dd class="mt-0.5"><span class="rounded-full px-2.5 py-0.5 text-xs font-medium {{ $riskColor }}">{{ ucfirst($risk) }}</span></dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Commit</dt><dd class="mt-0.5 font-mono text-xs">{{ $latestScan->commit_sha }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Scanned</dt><dd class="mt-0.5">{{ $latestScan->finished_at?->format('M j, Y H:i') ?: '—' }}</dd></div>
+                    </dl>
+
+                    @if ($latestScan->findings->isEmpty())
+                        <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">No obvious issues detected.</p>
+                    @else
+                        <ul class="mt-4 space-y-2">
+                            @foreach ($latestScan->findings as $finding)
+                                <li class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <span class="rounded-full bg-gray-100 px-2 py-0.5 font-medium dark:bg-gray-800">{{ $finding->severity }}</span>
+                                        <span class="font-mono">{{ $finding->rule }}</span>
+                                        <span class="font-mono text-gray-500 dark:text-gray-400">{{ $finding->file }}{{ $finding->line ? ':'.$finding->line : '' }}</span>
+                                    </div>
+                                    <p class="mt-1.5 text-gray-700 dark:text-gray-300">{{ $finding->description }}</p>
+                                    @if ($finding->snippet)
+                                        <pre class="mt-1.5 overflow-x-auto rounded-md bg-gray-50 p-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">{{ $finding->snippet }}</pre>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+
+                    <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                        Automated analysis only — not a security guarantee.
+                    </p>
+                @endif
+            </div>
         </div>
 
         <aside class="space-y-6">

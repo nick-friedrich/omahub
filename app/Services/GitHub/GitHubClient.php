@@ -91,6 +91,39 @@ class GitHubClient
         return $tags->json('0.name');
     }
 
+    /**
+     * Download the tarball of an exact commit as raw gzip bytes.
+     *
+     * This is the source of truth for deterministic scanning: it gives full,
+     * reproducible file coverage for a single commit in one request (rather
+     * than one `contents` API call per file).
+     */
+    public function tarball(GitHubRepository $repository, string $sha): string
+    {
+        $url = rtrim(config('services.github.codeload_url'), '/')
+            ."/{$repository->owner}/{$repository->name}/tar.gz/{$sha}";
+
+        try {
+            $response = Http::timeout(60)->retry(2, 200, throw: false)->get($url);
+        } catch (ConnectionException) {
+            throw GitHubRequestException::networkFailure();
+        }
+
+        if ($response->notFound()) {
+            throw GitHubRequestException::repositoryNotFound();
+        }
+
+        if (! $response->successful()) {
+            if ($response->status() === 429 || ($response->status() === 403 && $response->header('X-RateLimit-Remaining') === '0')) {
+                throw GitHubRequestException::rateLimited();
+            }
+
+            throw GitHubRequestException::requestFailed($response->status());
+        }
+
+        return $response->body();
+    }
+
     private function rawFile(GitHubRepository $repository, string $path, string $branch): ?string
     {
         $response = $this->get(

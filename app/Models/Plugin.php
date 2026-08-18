@@ -90,4 +90,9 @@ class Plugin extends Model
     {
         return $this->hasMany(PluginSubmission::class);
     }
+
+    public function securityScans(): HasMany
+    {
+        return $this->hasMany(SecurityScan::class);
+    }
 }
