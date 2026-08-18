@@ -55,7 +55,7 @@ class RecalculateScanRisk extends Command
                 default => RiskLevel::None,
             };
 
-            if ($scan->risk_level !== $risk) {
+            if ($scan->risk_level !== $risk->value) {
                 $scan->forceFill(['risk_level' => $risk])->save();
                 $changed++;
                 $this->line("  scan #{$scan->id} (plugin {$scan->plugin_id}): → {$risk->value}");

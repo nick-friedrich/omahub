@@ -41,6 +41,7 @@ class SecurityScan extends Model
         return $this->belongsTo(Plugin::class);
     }
 
+    /** @return HasMany<SecurityFinding, $this> */
     public function findings(): HasMany
     {
         return $this->hasMany(SecurityFinding::class);
