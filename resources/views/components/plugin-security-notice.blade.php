@@ -141,7 +141,7 @@
                         <li class="py-3">
                             <div class="flex flex-wrap items-center gap-2 text-xs">
                                 @if ($finding->isDocumentation())
-                                    <span class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">docs</span>
+                                    <span class="rounded-full bg-gray-200 px-2 py-0.5 font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">Docs</span>
                                 @else
                                     <span class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $finding->severity }}</span>
                                 @endif
