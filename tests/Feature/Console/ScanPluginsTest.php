@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Console;
 
+use App\Enums\SecurityScanStatus;
 use App\Models\Plugin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -65,5 +66,25 @@ class ScanPluginsTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertSame(0, $plugin->securityScans()->count());
+    }
+
+    public function test_stale_only_targets_plugins_missing_a_successful_scan_at_their_current_commit(): void
+    {
+        $alreadyScanned = Plugin::factory()->create(['latest_commit_sha' => 'current-sha']);
+        $alreadyScanned->securityScans()->create([
+            'commit_sha' => 'current-sha',
+            'status' => SecurityScanStatus::Succeeded,
+            'rules_run' => [],
+            'started_at' => now()->subDay(),
+            'finished_at' => now()->subDay(),
+        ]);
+
+        $needsScan = Plugin::factory()->create(['latest_commit_sha' => 'another-sha']);
+
+        $this->artisan('plugins:scan', ['--stale' => true, '--dry-run' => true])
+            ->expectsOutputToContain($needsScan->slug)
+            ->assertExitCode(0);
+
+        $this->assertSame(1, $alreadyScanned->securityScans()->count());
     }
 }

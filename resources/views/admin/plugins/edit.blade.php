@@ -120,9 +120,18 @@
                             @foreach ($latestScan->findings as $finding)
                                 <li class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                                     <div class="flex flex-wrap items-center gap-2 text-xs">
-                                        <span class="rounded-full bg-gray-100 px-2 py-0.5 font-medium dark:bg-gray-800">{{ $finding->severity }}</span>
-                                        <span class="font-mono">{{ $finding->rule }}</span>
-                                        <span class="font-mono text-gray-500 dark:text-gray-400">{{ $finding->file }}{{ $finding->line ? ':'.$finding->line : '' }}</span>
+                                        @if ($finding->isDocumentation())
+                                            <span class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">docs</span>
+                                        @else
+                                            <span class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $finding->severity }}</span>
+                                        @endif
+                                        <span class="rounded-md bg-gray-900/5 px-1.5 py-0.5 font-mono text-[11px] font-medium text-gray-800 dark:bg-white/10 dark:text-gray-100">{{ $finding->rule }}</span>
+                                        <a
+                                            href="{{ $plugin->githubBlobUrl($finding->repositoryPath(), $latestScan->commit_sha, $finding->line) }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="font-mono text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline dark:text-gray-400 dark:hover:text-white"
+                                        >{{ $finding->displayPath() }}{{ $finding->line ? ':'.$finding->line : '' }}</a>
                                     </div>
                                     <p class="mt-1.5 text-gray-700 dark:text-gray-300">{{ $finding->description }}</p>
                                     @if ($finding->snippet)

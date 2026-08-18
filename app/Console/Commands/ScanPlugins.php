@@ -3,12 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Enums\RiskLevel;
+use App\Enums\SecurityScanStatus;
 use App\Exceptions\GitHubRequestException;
 use App\Models\Plugin;
 use App\Models\SecurityFinding;
 use App\Models\SecurityScan;
 use App\Services\Security\SecurityScanner;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class ScanPlugins extends Command
@@ -16,6 +18,7 @@ class ScanPlugins extends Command
     protected $signature = 'plugins:scan
         {--ids= : Comma-separated plugin IDs to scan}
         {--after= : Only scan plugins with an ID greater than this (resume a stopped run)}
+        {--stale : Only scan plugins whose latest commit has not been successfully scanned}
         {--dry-run : Report what would be scanned without running anything}
         {--limit= : Maximum number of plugins to scan}';
 
@@ -128,6 +131,18 @@ class ScanPlugins extends Command
         $after = $this->option('after');
         if (is_string($after) && is_numeric($after) && (int) $after >= 1) {
             $query->where('id', '>', (int) $after);
+        }
+
+        // Scan only plugins whose latest commit has no successful scan yet.
+        // Idempotency (scan unique per plugin+commit) makes this the cheap way
+        // to keep reviewed state current: refresh commits, then scan --stale.
+        if ($this->option('stale')) {
+            $query
+                ->whereNotNull('latest_commit_sha')
+                ->whereDoesntHave('securityScans', function (Builder $q): void {
+                    $q->where('status', SecurityScanStatus::Succeeded)
+                        ->whereColumn('security_scans.commit_sha', 'plugins.latest_commit_sha');
+                });
         }
 
         $limit = $this->option('limit');

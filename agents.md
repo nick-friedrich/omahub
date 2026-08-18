@@ -87,6 +87,16 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
   daemon, the sandbox `-v` source is resolved by the host daemon, so it must be a host
   path. Set `SCAN_SANDBOX_HOST_REPO_PATH` to the host path of this repo; leave it unset
   when PHP runs directly on the host (local dev).
+- **Keeping scans current.** The public plugin page shows the latest scan as a review
+  panel (risk level, analyzed commit, findings) and marks it stale when the analyzed
+  commit predates the plugin's latest indexed commit. Nothing fetches GitHub live per
+  page view. Freshness comes from the scheduler (see `routes/console.php`): a daily
+  `plugins:refresh` updates commits at 03:10, then `plugins:scan --stale` at 04:10
+  re-scans only plugins whose latest commit has no successful scan. **These only run if
+  a cron triggers Laravel's scheduler** — add one host cron line:
+  ```bash
+  * * * * * docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan schedule:run >> /dev/null 2>&1
+  ```
 - **Keep `main` in sync with origin.** If you commit an ops change (like this doc or
   the deploy script) on the prod box, `git push origin main` so the next ff-pull
   doesn't "diverge". `git pull --ff-only` will refuse on a real divergence — don't

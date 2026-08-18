@@ -76,6 +76,18 @@ class Plugin extends Model
         return "https://raw.githubusercontent.com/{$this->repository_owner}/{$this->repository_name}/{$this->default_branch}";
     }
 
+    /**
+     * GitHub web link to a repository path at a specific ref (commit SHA or
+     * branch), with an optional line anchor — used for security findings.
+     */
+    public function githubBlobUrl(string $path, ?string $ref = null, ?int $line = null): string
+    {
+        $resolvedRef = is_string($ref) && $ref !== '' ? $ref : (string) ($this->default_branch ?? 'HEAD');
+        $url = "https://github.com/{$this->repository_owner}/{$this->repository_name}/blob/{$resolvedRef}/{$path}";
+
+        return $line !== null && $line > 0 ? $url.'#L'.$line : $url;
+    }
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class);

@@ -30,6 +30,7 @@ class PluginController extends Controller
 
         return view('plugins.show', [
             'plugin' => $plugin,
+            'latestScan' => $plugin->securityScans()->with('findings')->orderByDesc('id')->first(),
             'readme' => $plugin->readme_markdown !== null
                 ? $markdown->render($plugin->readme_markdown, $plugin->rawContentBaseUrl())
                 : null,

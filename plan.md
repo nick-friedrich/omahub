@@ -460,13 +460,25 @@ parsed structured `output`, and the `raw_response`, keyed to the same `(plugin_i
   - `eval`
   - writes outside expected plugin directories
 
+- **Documentation findings are reported but capped.** Files like `README.md`, `docs/*`,
+  `CHANGELOG`, `LICENSE` describe usage rather than execute code — a `curl | sh`
+  install snippet in a README is illustrative, not a vulnerability. Such findings are
+  still surfaced (tagged `docs` in the UI, with a link to the file at the scanned
+  commit) but never drive the whole-scan risk level: risk reflects executable code,
+  and a scan whose only findings are documentation is capped at `Low`. Running
+  `php artisan security:recalibrate` recomputes risk levels after a policy/severity
+  change without re-scanning.
+
 - Command (synchronous, resumable in batches, matching the `plugins:refresh` style):
 
   ```bash
-  php artisan plugins:scan --plugin=slug | --ids=1,2,3 | --all
-  php artisan plugins:scan --all --limit=50 --after=<id>
+  php artisan plugins:scan --ids=1,2,3 | --after=<id> | --stale
+  php artisan plugins:scan --stale --limit=50
   php artisan plugins:scan --dry-run
   ```
+
+  (`--stale` targets only plugins whose latest commit has no successful scan — the
+  cheap way to keep reviewed state current after a refresh.)
 
 - Config: `SCAN_SANDBOX_IMAGE` (a **local** image tag built on the server — never a
   registry image, see Production deployment concern), `SCAN_SANDBOX_HOST_REPO_PATH`
@@ -504,6 +516,15 @@ Automated analysis only — not a security guarantee.
 ```
 
 Show the analyzed commit and date.
+
+The public plugin detail page renders the latest scan as a full review panel (verdict,
+risk level, analyzed commit, scan date, findings) and warns when the analyzed commit
+predates the plugin's latest indexed commit ("Newer commit … not yet reviewed"). No
+live GitHub fetch happens per page view; freshness comes from a daily schedule
+(`routes/console.php`): `plugins:refresh` at 03:10 updates commits, then
+`plugins:scan --stale` at 04:10 re-scans only plugins whose latest commit has no
+successful scan. That schedule needs a host cron running `php artisan schedule:run`
+(see `agents.md`).
 
 ## Production deployment concern
 
@@ -549,8 +570,9 @@ without manual steps.
 - Feature test for `plugins:scan` using an extended `FakesGitHub` (codeload route) and the
   fake sandbox.
 
-**Later, only when justified:** auto-rescan when the upstream commit changes (needs
-scheduler/queues), community ratings brought in from V0.2, and making scans block
+**Later, only when justified:** real-time auto-rescan the moment an upstream commit
+changes (needs scheduler/queues; the daily stale-scan covers this in batch), community
+ratings brought in from V0.2, and making scans block
 publication if policy later changes.
 
 ---

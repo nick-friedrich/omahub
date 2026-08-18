@@ -111,10 +111,35 @@ final class ScanEngine
             }
         }
 
-        $riskLevel = RiskLevel::aggregate(array_map(
-            fn (RuleFinding $finding): RiskLevel => RiskLevel::tryFrom($finding->severity) ?? RiskLevel::None,
+        // Overlapping rule patterns can match the same line twice; keep a single
+        // finding per (rule, file, line).
+        $unique = [];
+        foreach ($findings as $finding) {
+            $key = $finding->rule."\0".$finding->file."\0".$finding->line;
+            $unique[$key] = $finding;
+        }
+        $findings = array_values($unique);
+
+        // Documentation files (README, docs/, *.md) are descriptive, not
+        // executable code. A `curl | sh` block in a README is a usage example,
+        // so documentation findings are reported but never determine "high"
+        // risk: the level reflects executable code, and a scan whose only
+        // findings are documentation is capped at Low.
+        $severity = fn (RuleFinding $finding): RiskLevel => RiskLevel::tryFrom($finding->severity) ?? RiskLevel::None;
+        $codeFindings = array_values(array_filter(
             $findings,
+            fn (RuleFinding $finding): bool => ! DocumentationFile::matches($finding->file),
         ));
+        $docFindings = array_values(array_filter(
+            $findings,
+            fn (RuleFinding $finding): bool => DocumentationFile::matches($finding->file),
+        ));
+
+        $riskLevel = match (true) {
+            $codeFindings !== [] => RiskLevel::aggregate(array_map($severity, $codeFindings)),
+            $docFindings !== [] => RiskLevel::Low,
+            default => RiskLevel::None,
+        };
 
         return new ScanResult($riskLevel, $findings, array_keys($rulesRun));
     }
