@@ -52,6 +52,13 @@
         'low' => 'bg-yellow-500 text-[#1b1b18] dark:bg-yellow-400 dark:text-[#1b1b18]',
         default => 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white',
     };
+
+    $riskTextColor = match ($risk) {
+        'high', 'critical' => 'text-red-800 dark:text-red-300',
+        'medium' => 'text-amber-800 dark:text-amber-300',
+        'low' => 'text-yellow-700 dark:text-yellow-300',
+        default => 'text-emerald-800 dark:text-emerald-300',
+    };
 @endphp
 
 @if (! $succeeded)
@@ -106,7 +113,7 @@
             <dl class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
                 <div>
                     <dt class="text-gray-500 dark:text-gray-400">Risk level</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900 dark:text-gray-100">{{ ucfirst((string) ($risk ?? 'none')) }}</dd>
+                    <dd class="mt-0.5 font-medium {{ $riskTextColor }}">{{ ucfirst((string) ($risk ?? 'none')) }}</dd>
                 </div>
                 <div>
                     <dt class="text-gray-500 dark:text-gray-400">Analyzed commit</dt>
