@@ -38,7 +38,7 @@
             </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($recentlyUpdated as $plugin)
-                    <x-plugin-card :plugin="$plugin" />
+                    <x-plugin-card :plugin="$plugin" :image-url="$previewImages[$plugin->getKey()]" show-preview />
                 @endforeach
             </div>
         </section>
@@ -50,7 +50,7 @@
             </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($newest as $plugin)
-                    <x-plugin-card :plugin="$plugin" />
+                    <x-plugin-card :plugin="$plugin" :image-url="$previewImages[$plugin->getKey()]" show-preview />
                 @endforeach
             </div>
         </section>
@@ -62,7 +62,7 @@
             </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($popular as $plugin)
-                    <x-plugin-card :plugin="$plugin" />
+                    <x-plugin-card :plugin="$plugin" :image-url="$previewImages[$plugin->getKey()]" show-preview />
                 @endforeach
             </div>
         </section>
