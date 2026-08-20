@@ -113,11 +113,11 @@
                         <div><dt class="text-gray-500 dark:text-gray-400">Scanned</dt><dd class="mt-0.5">{{ $latestScan->finished_at?->format('M j, Y H:i') ?: '—' }}</dd></div>
                     </dl>
 
-                    @if ($latestScan->findings->isEmpty())
+                    @if ($latestScan->sortedFindings()->isEmpty())
                         <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">No obvious issues detected.</p>
                     @else
                         <ul class="mt-4 space-y-2">
-                            @foreach ($latestScan->findings as $finding)
+                            @foreach ($latestScan->sortedFindings() as $finding)
                                 <li class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                                     <div class="flex flex-wrap items-center gap-2 text-xs">
                                         @if ($finding->isDocumentation())

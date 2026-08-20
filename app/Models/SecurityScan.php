@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * A deterministic content scan of a single plugin repository at an exact commit.
@@ -46,6 +47,32 @@ class SecurityScan extends Model
     public function findings(): HasMany
     {
         return $this->hasMany(SecurityFinding::class);
+    }
+
+    /**
+     * Findings ordered most-relevant-first: executable-code findings sorted by
+     * severity (critical → high → medium → low), then documentation findings
+     * last. Documentation findings are grouped at the end regardless of their
+     * severity since they describe usage, not executable code.
+     *
+     * @return Collection<int, SecurityFinding>
+     */
+    public function sortedFindings(): Collection
+    {
+        $severityRank = [
+            'critical' => 4,
+            'high' => 3,
+            'medium' => 2,
+            'low' => 1,
+        ];
+
+        return $this->findings
+            ->sortByDesc(function (SecurityFinding $finding) use ($severityRank): int {
+                $rank = $severityRank[strtolower((string) $finding->severity)] ?? 0;
+
+                return $finding->isDocumentation() ? $rank : 100 + $rank;
+            })
+            ->values();
     }
 
     public function scopeForPlugin(Builder $query, Plugin $plugin): Builder

@@ -6,7 +6,7 @@
 @php
     $succeeded = $scan !== null && $scan->status === App\Enums\SecurityScanStatus::Succeeded;
     $risk = $succeeded ? $scan->risk_level : null;
-    $findings = $succeeded ? ($scan->findings ?? collect()) : collect();
+    $findings = $succeeded ? $scan->sortedFindings() : collect();
     $count = $findings->count();
 
     $isStale = $succeeded
