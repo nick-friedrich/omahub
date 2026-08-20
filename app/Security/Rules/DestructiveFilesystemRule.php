@@ -36,7 +36,9 @@ final class DestructiveFilesystemRule extends Rule
                 'description' => 'Recursive delete targeting an absolute or variable path.',
             ],
             [
-                'pattern' => '/\b(?:dd|mkfs\.\w+|mkswap|fdisk|parted|shred|badblocks|sfdisk)\b[^\n;|&$]{0,120}/i',
+                // `dd` is only a disk-write when it targets an output operand;
+                // bare `dd` is also a common date-format token (e.g. "dd MMM").
+                'pattern' => '/\b(?:mkfs\.\w+|mkswap|fdisk|parted|shred|badblocks|sfdisk)\b[^\n;|&$]{0,120}|\bdd\b[^\n;|&$]{0,120}\bof\s*=/i',
                 'description' => 'Low-level disk manipulation or write command.',
             ],
             [

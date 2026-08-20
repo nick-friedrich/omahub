@@ -117,6 +117,47 @@ class ScanEngineTest extends TestCase
         $this->assertCount(1, $curlPipe);
     }
 
+    public function test_manifest_date_format_with_bare_dd_is_not_a_disk_write(): void
+    {
+        // "dd MMM" is a date-format token, not the `dd` disk utility. A bare
+        // `dd` without an `of=` output operand must not be flagged.
+        $dir = $this->scanDir([
+            'manifest.json' => <<<'JSON'
+                {
+                  "id": "demo.clock",
+                  "format": "dd MMM yyyy",
+                  "description": "Shows the date as dd MMM yyyy in the panel."
+                }
+                JSON,
+        ]);
+
+        $result = $this->engine->scanDirectory($dir);
+
+        $diskWrites = array_filter(
+            $result->findings,
+            fn ($finding) => $finding->rule === 'destructive_filesystem',
+        );
+        $this->assertSame([], array_values($diskWrites));
+        $this->assertSame(RiskLevel::None, $result->riskLevel);
+    }
+
+    public function test_dd_with_output_operand_is_reported_as_disk_write(): void
+    {
+        $dir = $this->scanDir([
+            'wipe.sh' => 'dd if=/dev/zero of=/dev/sda bs=4M status=progress oflag=direct',
+        ]);
+
+        $result = $this->engine->scanDirectory($dir);
+
+        $diskWrites = array_values(array_filter(
+            $result->findings,
+            fn ($finding) => $finding->rule === 'destructive_filesystem',
+        ));
+        $this->assertCount(1, $diskWrites);
+        $this->assertStringContainsString('/dev/sda', $diskWrites[0]->snippet);
+        $this->assertSame(RiskLevel::High, $result->riskLevel);
+    }
+
     private function scanDir(array $files): string
     {
         $dir = sys_get_temp_dir().'/scan-'.bin2hex(random_bytes(6));
