@@ -15,6 +15,10 @@ class MarkdownRenderer
 
     private ?string $imageBaseUrl = null;
 
+    private ?string $firstImageUrl = null;
+
+    private bool $extractFirstImage = false;
+
     public function __construct()
     {
         // Raw HTML in untrusted READMEs is escaped rather than rendered,
@@ -40,6 +44,10 @@ class MarkdownRenderer
                 if ($this->isLocalImage($url) && $this->imageBaseUrl !== null) {
                     $node->setUrl($this->resolveImageUrl($url));
                 }
+
+                if ($this->extractFirstImage && $this->firstImageUrl === null && $this->isWebUrl($node->getUrl())) {
+                    $this->firstImageUrl = $node->getUrl();
+                }
             }
         });
 
@@ -61,10 +69,32 @@ class MarkdownRenderer
         }
     }
 
+    public function firstImageUrl(string $markdown, ?string $imageBaseUrl = null): ?string
+    {
+        $this->imageBaseUrl = $imageBaseUrl;
+        $this->extractFirstImage = true;
+        $this->firstImageUrl = null;
+
+        try {
+            $this->converter->convert($markdown);
+
+            return $this->firstImageUrl;
+        } finally {
+            $this->imageBaseUrl = null;
+            $this->extractFirstImage = false;
+            $this->firstImageUrl = null;
+        }
+    }
+
     private function isLocalImage(string $url): bool
     {
         // Absolute URLs, protocol-relative URLs, data URIs and root paths stay as-is.
         return ! preg_match('/^(?:[a-z][a-z0-9+.-]*:)?\/\/|^(?:data:|\/)/i', $url);
+    }
+
+    private function isWebUrl(string $url): bool
+    {
+        return preg_match('/^https?:\/\//i', $url) === 1;
     }
 
     private function resolveImageUrl(string $url): string

@@ -379,45 +379,129 @@ Add only the tools needed to review submissions, reported reviews, and blocked o
 
 ---
 
-# V0.3 — Deterministic security analysis
+# V0.3 — Plugin review pipeline
 
-Security analysis must be tied to an exact commit. Add the models only now:
+A three-stage review pipeline checks every imported plugin before (and after) it is listed.
+
+```text
+ Deterministic scan ─► AI review ─► Human review
+   (sandboxed rules)   (OpenRouter)   (decision)
+```
+
+Decisions locked in:
+
+- **Human approval is the only gate.** Deterministic and AI results are advisory context
+  shown to the reviewer; they never block publication on their own.
+- **Deterministic first.** Build and prove the deterministic scan before any AI work.
+- **AI provider:** configurable model via **OpenRouter** (default DeepSeek, config-driven
+  `AI_MODEL`). AI must return structured output and must never replace or hide
+  deterministic findings.
+- **Fetch real content by tarball.** Download `https://codeload.github.com/{owner}/{repo}/tar.gz/{sha}`
+  for the exact commit — one request, full file coverage, reproducible — instead of
+  many per-file `contents` calls.
+- **Sandbox the scan in Docker.** Untrusted repository content is downloaded and
+  extracted inside a disposable container, never on the host.
+- **Run synchronously via Artisan commands** until a measured need for queues.
+
+Trust stays explicit and separate (`author_verified`, `manifest_valid`,
+`automated_security_scan`, `manual_review`) — a scan result never implies safety.
+
+## Data model
 
 ```text
 SecurityScan
 SecurityFinding
+AiReview
 ```
 
-Each scan records:
+`SecurityScan` records:
 
 ```text
 plugin_id
 commit_sha
-status
-risk_level
+status           running | succeeded | failed
+risk_level       none | low | medium | high | critical
+rules_run        JSON
 started_at
 finished_at
 ```
 
-Initial deterministic checks can identify behavior such as:
+Unique on `(plugin_id, commit_sha)`: rescanning the same commit is a no-op; the scan is
+re-run only when the upstream commit changes (idempotency per commit).
 
-- `sudo`
-- destructive filesystem commands
-- `curl | sh` or `wget | sh`
-- permission and ownership changes
-- systemd or cron persistence
-- shell profile modification
-- credential or SSH key access
-- package manager operations
-- downloads and external hosts
-- obfuscated commands
-- decode-and-execute patterns
-- `eval`
-- writes outside expected plugin directories
+`SecurityFinding` records severity, rule, file, line, snippet, and description — matching
+the rule that produced it.
 
-Each finding records severity, rule, file, line, and description. Results must be reproducible for the same commit.
+`AiReview` records provider, model, status, summary, risk_level, recommendation, the
+parsed structured `output`, and the `raw_response`, keyed to the same `(plugin_id, commit_sha)`.
 
-Display cautious language:
+## Stage 1 — Deterministic scan (in progress)
+
+- `GitHubClient::tarball()` downloads the repo tarball for a commit.
+- A `SandboxRunner` (behind an interface, faked in tests) shells to
+  `docker run --rm` with a scanner image that downloads + extracts the tarball **inside
+  the container**, walks the files, and prints a findings JSON to stdout. The scanner image
+  mounts this repo read-only and runs the same shared rule classes, keeping the sandbox
+  and application code in sync.
+- A `SecurityScanner` aggregates rule findings into a whole-scan `risk_level`.
+- Rules live in `app/Security/Rules/*.php` (id, severity, `matchesFile`, `scan`) and cover:
+
+  - `sudo`
+  - destructive filesystem commands
+  - `curl | sh` or `wget | sh`
+  - permission and ownership changes
+  - systemd or cron persistence
+  - shell profile modification
+  - credential or SSH key access
+  - package manager operations
+  - downloads and external hosts
+  - obfuscated commands
+  - decode-and-execute patterns
+  - `eval`
+  - writes outside expected plugin directories
+
+- **Documentation findings are reported but capped.** Files like `README.md`, `docs/*`,
+  `CHANGELOG`, `LICENSE` describe usage rather than execute code — a `curl | sh`
+  install snippet in a README is illustrative, not a vulnerability. Such findings are
+  still surfaced (tagged `docs` in the UI, with a link to the file at the scanned
+  commit) but never drive the whole-scan risk level: risk reflects executable code,
+  and a scan whose only findings are documentation is capped at `Low`. Running
+  `php artisan security:recalibrate` recomputes risk levels after a policy/severity
+  change without re-scanning.
+
+- Command (synchronous, resumable in batches, matching the `plugins:refresh` style):
+
+  ```bash
+  php artisan plugins:scan --ids=1,2,3 | --after=<id> | --stale
+  php artisan plugins:scan --stale --limit=50
+  php artisan plugins:scan --dry-run
+  ```
+
+  (`--stale` targets only plugins whose latest commit has no successful scan — the
+  cheap way to keep reviewed state current after a refresh.)
+
+- Config: `SCAN_SANDBOX_IMAGE` (a **local** image tag built on the server — never a
+  registry image, see Production deployment concern), `SCAN_SANDBOX_HOST_REPO_PATH`
+  (host path of this repo when the app runs in Docker, see Production deployment
+  concern), `SCAN_SANDBOX_ENABLED` (when disabled, scan runs directly for local dev /
+  tests), codeload URL.
+
+## Stage 2 — AI review (deferred until deterministic is proven)
+
+- `AiClient` interface + `OpenRouterClient` implementation. Config: `OPENROUTER_API_KEY`,
+  `AI_MODEL`, `OPENROUTER_BASE_URL`.
+- Send manifest, scanned file contents, and the deterministic findings summary with a
+  strict prompt requesting structured JSON. Validate the parsed shape before persisting.
+- A failed AI call records a failed review and does not halt the pipeline (advisory).
+
+## Stage 3 — Human review (deferred)
+
+- Extend the admin submission and plugin pages to show a review panel: scan risk level,
+  findings (rule/severity/file/line/snippet), AI summary/concerns, the analyzed commit and
+  date, plus cautious language.
+- The existing approve/reject buttons remain the only publish gate.
+
+## Display language (all stages)
 
 ```text
 No obvious issues detected
@@ -431,9 +515,65 @@ Always display:
 Automated analysis only — not a security guarantee.
 ```
 
-Show the analyzed commit and date. Rescan only when the upstream commit changes. This is the point at which database-backed Laravel queues and the scheduler are likely justified; SQLite remains acceptable until measured concurrency or deployment constraints require a change.
+Show the analyzed commit and date.
 
-AI analysis is optional and comes only after deterministic scanning produces useful results. It must return structured output and must never replace or hide deterministic findings.
+The public plugin detail page renders the latest scan as a full review panel (verdict,
+risk level, analyzed commit, scan date, findings) and warns when the analyzed commit
+predates the plugin's latest indexed commit ("Newer commit … not yet reviewed"). No
+live GitHub fetch happens per page view; freshness comes from a daily schedule
+(`routes/console.php`): `plugins:refresh` at 03:10 updates commits, then
+`plugins:scan --stale` at 04:10 re-scans only plugins whose latest commit has no
+successful scan. That schedule needs a host cron running `php artisan schedule:run`
+(see `agents.md`).
+
+## Production deployment concern
+
+The app runs in `reverse-proxy-fpm-1` (repo bind-mounted). Launching sandbox containers
+requires Docker access from the app — either mount `/var/run/docker.sock` into that
+container or run the scanner as a separate worker container. Decide this before
+deploying scans to production.
+
+**Sandbox image: built on the server, never pushed to a registry.** There is no
+`ghcr.io`/Docker Hub image for the scanner — that was tried and the tag does not exist
+(`manifest unknown`), and we don't want to publish one. `scripts/deploy.sh` preflights
+the sandbox on every deploy (docker CLI in the app container, host daemon reachable,
+image present) and builds or picks the image itself:
+
+1. **Reuse the app's own runtime image already on the server** (default). The sandbox
+   only needs PHP plus the extensions the scan uses (`PharData`, `zlib`, …); the repo is
+   bind-mounted read-only, so the application code comes from the mount and stays in
+   sync with the host automatically. `deploy.sh` derives it from the fpm container's own
+   image — no Dockerfile at all.
+2. **Only if the scan needs a different runtime:** keep a dedicated `Dockerfile` **on the
+   server only, outside the repo** (default path `/opt/omahub-scan/Dockerfile` — never
+   committed, never pushed). `deploy.sh` builds it there (`docker build -t omahub-scan .`)
+   when the file exists and points the app at the local tag. Rebuild on the server
+   whenever the runtime changes.
+
+**App-in-Docker path mapping (Docker-out-of-Docker).** The app runs inside
+`reverse-proxy-fpm-1` and launches sandbox containers through a mounted
+`/var/run/docker.sock`. The sandbox `-v` source is resolved by the **host** daemon, so
+when the app is containerised, set `SCAN_SANDBOX_HOST_REPO_PATH` to the host path of
+this repo (e.g. `/opt/omahub`). When PHP runs on the host (local dev), leave it unset —
+`base_path()` is already a host path.
+
+**Migrations run on deploy.** `scripts/deploy.sh` runs `artisan migrate --force` on every
+deploy, so new migrations (e.g. `security_scans` / `security_findings`) reach production
+without manual steps.
+
+## Testing
+
+- Unit tests per rule, with fixtures under `tests/Fixtures/security/` (a clean repo and a
+  repo containing rule-triggering patterns).
+- `SecurityScanner` and `SandboxRunner` tests with a fake runner; idempotency test (same
+  commit → one `SecurityScan`; new commit → rescans).
+- Feature test for `plugins:scan` using an extended `FakesGitHub` (codeload route) and the
+  fake sandbox.
+
+**Later, only when justified:** real-time auto-rescan the moment an upstream commit
+changes (needs scheduler/queues; the daily stale-scan covers this in batch), community
+ratings brought in from V0.2, and making scans block
+publication if policy later changes.
 
 ---
 

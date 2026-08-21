@@ -77,6 +77,76 @@
                     <button type="submit" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-900">Refresh</button>
                 </div>
             </form>
+
+            <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm dark:border-gray-800 dark:bg-[#161615]">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-semibold">Security review</h2>
+                        <p class="mt-1 text-xs text-gray-500">Deterministic, rule-based scan of the repository at its current commit.</p>
+                    </div>
+                    <form method="POST" action="{{ route('admin.plugins.scan', $plugin) }}">
+                        @csrf
+                        <button type="submit" class="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700">
+                            @if ($latestScan) Rescan @else Run scan @endif
+                        </button>
+                    </form>
+                </div>
+
+                @if (!$latestScan)
+                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                        Not yet scanned. Run a scan to check this repository for potentially dangerous behavior.
+                    </p>
+                @else
+                    @php
+                        $risk = $latestScan->risk_level ?? 'none';
+                        $riskColor = match ($risk) {
+                            'critical', 'high' => 'bg-red-600 text-white dark:bg-red-500 dark:text-white',
+                            'medium' => 'bg-amber-500 text-[#1b1b18] dark:bg-amber-400 dark:text-[#1b1b18]',
+                            'low' => 'bg-yellow-500 text-[#1b1b18] dark:bg-yellow-400 dark:text-[#1b1b18]',
+                            default => 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white',
+                        };
+                    @endphp
+
+                    <dl class="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Risk</dt><dd class="mt-0.5"><span class="rounded-full px-2.5 py-0.5 text-xs font-medium {{ $riskColor }}">{{ ucfirst($risk) }}</span></dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Commit</dt><dd class="mt-0.5 font-mono text-xs">{{ $latestScan->commit_sha }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Scanned</dt><dd class="mt-0.5">{{ $latestScan->finished_at?->format('M j, Y H:i') ?: '—' }}</dd></div>
+                    </dl>
+
+                    @if ($latestScan->sortedFindings()->isEmpty())
+                        <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">No obvious issues detected.</p>
+                    @else
+                        <ul class="mt-4 space-y-2">
+                            @foreach ($latestScan->sortedFindings() as $finding)
+                                <li class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        @if ($finding->isDocumentation())
+                                            <span class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">docs</span>
+                                        @else
+                                            <span class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $finding->severity }}</span>
+                                        @endif
+                                        <span class="rounded-md bg-white/70 px-1.5 py-0.5 font-mono text-xs font-semibold text-[#1b1b18] dark:bg-white/10 dark:text-[#EDEDEC]">{{ $finding->rule }}</span>
+                                        <a
+                                            href="{{ $plugin->githubBlobUrl($finding->repositoryPath(), $latestScan->commit_sha, $finding->line) }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="font-mono text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline dark:text-gray-400 dark:hover:text-white"
+                                        >{{ $finding->displayPath() }}{{ $finding->line ? ':'.$finding->line : '' }}</a>
+                                    </div>
+                                    <p class="mt-1.5 text-gray-700 dark:text-gray-300">{{ $finding->description }}</p>
+                                    @if ($finding->snippet)
+                                        <pre class="mt-1.5 overflow-x-auto rounded-md bg-gray-50 p-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">{{ $finding->snippet }}</pre>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+
+                    <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                        Automated analysis only — not a security guarantee.
+                    </p>
+                @endif
+            </div>
         </div>
 
         <aside class="space-y-6">

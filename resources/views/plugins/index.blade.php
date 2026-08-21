@@ -43,7 +43,7 @@
             @else
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($plugins as $plugin)
-                        <x-plugin-card :plugin="$plugin" />
+                        <x-plugin-card :plugin="$plugin" :image-url="$previewImages[$plugin->getKey()]" show-preview />
                     @endforeach
                 </div>
 

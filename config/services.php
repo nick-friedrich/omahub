@@ -17,6 +17,7 @@ return [
     'github' => [
         'token' => env('GITHUB_TOKEN'),
         'api_url' => env('GITHUB_API_URL', 'https://api.github.com'),
+        'codeload_url' => env('GITHUB_CODELOAD_URL', 'https://codeload.github.com'),
         'user_agent' => env('GITHUB_USER_AGENT', 'Omahub'),
         'client_id' => env('GITHUB_CLIENT_ID'),
         'client_secret' => env('GITHUB_CLIENT_SECRET'),

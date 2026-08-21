@@ -52,6 +52,22 @@ php artisan plugins:refresh --dry-run       # list targets without calling GitHu
 
 Refresh is idempotent: re-importing a repository updates the existing plugin in place and preserves its status. If a repository has moved, the existing row is updated to its new owner/name instead of creating a duplicate. Failures (repos without a root `manifest.json`, or moved or deleted repositories) are reported per plugin and the run continues; only a GitHub API rate limit stops the run early, with the resume command printed. The importer fetches the README from the repository's default branch. Set `GITHUB_TOKEN` in `.env` (e.g. `echo "GITHUB_TOKEN=$(gh auth token)" >> .env`) to avoid the unauthenticated rate limit when refreshing many plugins at once.
 
+## Deterministic security scan
+
+Each plugin can be scanned for potentially dangerous behavior by running static rules over its repository content at the exact commit currently indexed:
+
+```bash
+php artisan plugins:scan                  # scan every plugin
+php artisan plugins:scan --ids=1,2,3      # scan specific plugins
+php artisan plugins:scan --after=108      # resume a stopped run from plugin ID 108
+php artisan plugins:scan --limit=50       # cap the number scanned
+php artisan plugins:scan --dry-run        # list targets without scanning
+```
+
+The scan downloads the repository tarball (`codeload.github.com`) and runs rule-based checks (sudo, `curl | sh`, `eval`, decode-and-execute, persistence, credential access, package managers, destructive filesystem commands, and more). Results are stored per commit (`security_scans` / `security_findings`) and are **idempotent**: re-scanning the same commit is a no-op, and a scan is only re-run when the upstream commit changes. In the admin area (`GET /admin/plugins/{plugin}/edit`), a "Security review" panel shows the latest risk level and findings, with a button to trigger a scan. A scan is advisory context for the maintainer — it never blocks publication on its own.
+
+By default untrusted repository content is processed inside a **Docker sandbox** (`SCAN_SANDBOX_ENABLED=true`). Set `SCAN_SANDBOX_ENABLED=false` to scan on the host instead (convenient for local development and tests). The scanner image must provide the application's runtime — see `config/security_scan.php` and the deployment notes in `agents.md`.
+
 ## Authentication (GitHub OAuth)
 
 Sign-in is required to submit a plugin, which keeps the registry spam-free. Configuring it requires a GitHub OAuth App:

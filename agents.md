@@ -64,6 +64,39 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
 
 - **Host php/composer don't exist** — always qualify artisan/composer with
   `docker exec reverse-proxy-fpm-1 …` (paths relative to `/srv/omahub`).
+- **The security scan needs Docker from inside the app container.** The deterministic
+  scan (`php artisan plugins:scan`, or the "Security review" button in the admin) runs
+  untrusted repository content inside a disposable Docker sandbox
+  (`DockerSandboxRunner`). For that to work, the app container must have the `docker`
+  CLI installed and be able to reach the Docker daemon:
+  - the simplest option is to mount `/var/run/docker.sock:/var/run/docker.sock` into
+    `reverse-proxy-fpm-1` (a Docker-out-of-Docker setup); or
+  - run scans from a separate worker that already has Docker access.
+  Without this, scan commands fail at container launch. In local/dev, set
+  `SCAN_SANDBOX_ENABLED=false` to scan in-process instead (no Docker needed).
+  `scripts/deploy.sh` preflights all of this on every deploy and fails with a clear
+  message when something is missing.
+- **The sandbox image must provide the application's runtime.** `DockerSandboxRunner`
+  runs `php artisan scan:execute` inside the container with this repo bind-mounted
+  read-only. Reuse the app's own php-fpm image (or one with the same runtime/autoload)
+  so the sandbox runs the exact same rule code as the host. There is **no registry
+  image** — `deploy.sh` derives the image from the fpm container, or builds
+  `/opt/omahub-scan/Dockerfile` if that file exists on the server. Configure via
+  `SCAN_SANDBOX_IMAGE` (`config/security_scan.php`).
+- **App-in-Docker path mapping.** When the app runs in a container and talks to the host
+  daemon, the sandbox `-v` source is resolved by the host daemon, so it must be a host
+  path. Set `SCAN_SANDBOX_HOST_REPO_PATH` to the host path of this repo; leave it unset
+  when PHP runs directly on the host (local dev).
+- **Keeping scans current.** The public plugin page shows the latest scan as a review
+  panel (risk level, analyzed commit, findings) and marks it stale when the analyzed
+  commit predates the plugin's latest indexed commit. Nothing fetches GitHub live per
+  page view. Freshness comes from the scheduler (see `routes/console.php`): a daily
+  `plugins:refresh` updates commits at 03:10, then `plugins:scan --stale` at 04:10
+  re-scans only plugins whose latest commit has no successful scan. **These only run if
+  a cron triggers Laravel's scheduler** — add one host cron line:
+  ```bash
+  * * * * * docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan schedule:run >> /dev/null 2>&1
+  ```
 - **Keep `main` in sync with origin.** If you commit an ops change (like this doc or
   the deploy script) on the prod box, `git push origin main` so the next ff-pull
   doesn't "diverge". `git pull --ff-only` will refuse on a real divergence — don't

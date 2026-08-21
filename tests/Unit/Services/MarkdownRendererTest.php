@@ -59,6 +59,22 @@ class MarkdownRendererTest extends TestCase
         $this->assertStringContainsString('src="preview.png"', $html);
     }
 
+    public function test_it_extracts_the_first_readme_image(): void
+    {
+        $url = $this->renderer->firstImageUrl(
+            "`![not an image](ignored.png)`\n\n![preview][image]\n\n[image]: docs/preview.png",
+            'https://raw.githubusercontent.com/omarchy/example/main',
+        );
+
+        $this->assertSame('https://raw.githubusercontent.com/omarchy/example/main/docs/preview.png', $url);
+    }
+
+    public function test_it_only_extracts_web_images(): void
+    {
+        $this->assertNull($this->renderer->firstImageUrl('![local](preview.png)'));
+        $this->assertNull($this->renderer->firstImageUrl('![unsafe](data:image/png;base64,abc)'));
+    }
+
     public function test_it_escapes_raw_html_instead_of_rendering_it(): void
     {
         $html = $this->renderer->render("<script>alert('xss')</script>\n\n**bold**");

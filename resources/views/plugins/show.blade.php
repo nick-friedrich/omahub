@@ -52,7 +52,7 @@
         </div>
     </header>
 
-    <x-plugin-security-notice :plugin="$plugin" />
+    <x-plugin-security-notice :plugin="$plugin" :scan="$latestScan" />
 
     <x-install-command command="omarchy plugin add {{ $plugin->repository_url }} --enable" />
 
