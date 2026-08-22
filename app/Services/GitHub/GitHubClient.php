@@ -73,6 +73,41 @@ class GitHubClient
         return $response->json();
     }
 
+    /**
+     * GET the head commit of the default branch, honouring an optional
+     * If-None-Match. GitHub answers 304 (which does not count against the API
+     * rate limit) when nothing has changed; the caller can then skip the rest
+     * of the import. Returns null for 304, otherwise the commit payload plus
+     * the response ETag to persist for the next run.
+     *
+     * @return array{commit: array<string, mixed>, etag: ?string}|null
+     */
+    public function conditionalHeadCommit(
+        GitHubRepository $repository,
+        string $branch,
+        ?string $ifNoneMatch,
+    ): ?array {
+        $response = $this->get(
+            "repos/{$repository->owner}/{$repository->name}/commits/{$branch}",
+            [],
+            'application/vnd.github+json',
+            $ifNoneMatch,
+        );
+
+        if ($response->status() === 304) {
+            return null;
+        }
+
+        $this->ensureSuccessful($response);
+
+        $etag = $response->header('ETag');
+
+        return [
+            'commit' => $response->json(),
+            'etag' => is_string($etag) ? $etag : null,
+        ];
+    }
+
     public function latestVersion(GitHubRepository $repository): ?string
     {
         $release = $this->get("repos/{$repository->owner}/{$repository->name}/releases/latest");
@@ -142,16 +177,20 @@ class GitHubClient
     }
 
     /** @param array<string, mixed> $query */
-    private function get(string $path, array $query = [], string $accept = 'application/vnd.github+json'): Response
-    {
+    private function get(
+        string $path,
+        array $query = [],
+        string $accept = 'application/vnd.github+json',
+        ?string $ifNoneMatch = null,
+    ): Response {
         try {
-            return $this->request($accept)->get($path, $query);
+            return $this->request($accept, $ifNoneMatch)->get($path, $query);
         } catch (ConnectionException) {
             throw GitHubRequestException::networkFailure();
         }
     }
 
-    private function request(string $accept): PendingRequest
+    private function request(string $accept, ?string $ifNoneMatch = null): PendingRequest
     {
         $request = Http::baseUrl(rtrim(config('services.github.api_url'), '/'))
             ->accept($accept)
@@ -161,6 +200,10 @@ class GitHubClient
             ])
             ->timeout(15)
             ->retry(2, 200, throw: false);
+
+        if (filled($ifNoneMatch)) {
+            $request = $request->withHeaders(['If-None-Match' => $ifNoneMatch]);
+        }
 
         $token = config('services.github.token');
 

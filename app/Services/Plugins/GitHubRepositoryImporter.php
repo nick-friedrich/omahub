@@ -17,9 +17,37 @@ class GitHubRepositoryImporter
         private readonly ManifestValidator $manifests,
     ) {}
 
-    public function import(string $url): Plugin
+    public function import(string $url, ?string $ifNoneMatchEtag = null): Plugin
     {
         $requestedRepository = GitHubRepository::fromUrl($url);
+
+        // Probe the default-branch head with If-None-Match before fetching
+        // anything else. A 304 Not Modified (free of the API rate limit) means
+        // the commit map is unchanged, so all remaining calls can be skipped —
+        // only the indexed timestamp is refreshed.
+        if (filled($ifNoneMatchEtag)) {
+            $existing = Plugin::query()
+                ->where('repository_owner', $requestedRepository->owner)
+                ->where('repository_name', $requestedRepository->name)
+                ->first();
+
+            if ($existing !== null && is_string($existing->default_branch) && $existing->default_branch !== '') {
+                $probe = $this->github->conditionalHeadCommit(
+                    new GitHubRepository($existing->repository_owner, $existing->repository_name),
+                    $existing->default_branch,
+                    $ifNoneMatchEtag,
+                );
+
+                if ($probe === null) {
+                    return DB::transaction(function () use ($existing): Plugin {
+                        $existing->forceFill(['last_indexed_at' => now()])->save();
+
+                        return $existing->refresh();
+                    });
+                }
+            }
+        }
+
         $repositoryData = $this->github->repository($requestedRepository);
         $repository = $this->repositoryFromResponse($repositoryData);
         $defaultBranch = $repositoryData['default_branch'] ?? null;
@@ -37,7 +65,8 @@ class GitHubRepositoryImporter
         $manifest = $this->manifests->validate($manifestJson);
         $this->validateEntryPointsExist($manifest, $repository, $defaultBranch);
         $readme = $this->github->readme($repository, $defaultBranch);
-        $commit = $this->github->headCommit($repository, $defaultBranch);
+        $commitResponse = $this->github->conditionalHeadCommit($repository, $defaultBranch, null);
+        $commit = $commitResponse['commit'];
         $latestVersion = $this->github->latestVersion($repository) ?? $manifest['version'];
         $license = $this->license($manifest, $repositoryData);
         $commitSha = $commit['sha'] ?? null;
@@ -45,6 +74,8 @@ class GitHubRepositoryImporter
         if (! is_string($commitSha) || $commitSha === '') {
             throw new UnexpectedValueException('GitHub did not return the latest commit SHA.');
         }
+
+        $githubEtag = filled($commitResponse['etag']) ? $commitResponse['etag'] : null;
 
         return DB::transaction(function () use (
             $requestedRepository,
@@ -56,6 +87,7 @@ class GitHubRepositoryImporter
             $commitSha,
             $latestVersion,
             $license,
+            $githubEtag,
         ): Plugin {
             $plugin = Plugin::query()->firstOrNew([
                 'repository_owner' => $requestedRepository->owner,
@@ -98,6 +130,7 @@ class GitHubRepositoryImporter
                 'default_branch' => $defaultBranch,
                 'latest_commit_sha' => $commitSha,
                 'latest_version' => $latestVersion,
+                'github_etag' => $githubEtag,
                 'stars_count' => $repositoryData['stargazers_count'] ?? 0,
                 'forks_count' => $repositoryData['forks_count'] ?? 0,
                 'open_issues_count' => $repositoryData['open_issues_count'] ?? 0,

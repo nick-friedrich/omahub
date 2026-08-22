@@ -14,13 +14,17 @@ Artisan::command('inspire', function () {
 // page reads stored data and marks scans stale when the analyzed commit predates
 // the latest known commit.
 //
+// Refresh every hour. Unchanged plugins are skipped cheaply via GitHub ETag /
+// If-None-Match (304 responses do not count against the API rate limit), so an
+// hourly run stays well inside a 5k/hour token quota even with ~1k plugins.
+//
 // These entries only run if something triggers Laravel's scheduler. In production
 // this box has no queue workers, so add one host cron line:
 //   * * * * * docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan schedule:run >> /dev/null 2>&1
 Schedule::command('plugins:refresh')
-    ->dailyAt('03:10')
+    ->hourlyAt(10)
     ->withoutOverlapping();
 
 Schedule::command('plugins:scan --stale')
-    ->dailyAt('04:10')
+    ->hourlyAt(40)
     ->withoutOverlapping();

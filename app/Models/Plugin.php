@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'default_branch',
     'latest_commit_sha',
     'latest_version',
+    'github_etag',
     'stars_count',
     'forks_count',
     'open_issues_count',

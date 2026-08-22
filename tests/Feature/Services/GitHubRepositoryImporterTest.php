@@ -98,6 +98,25 @@ class GitHubRepositoryImporterTest extends TestCase
         $this->assertDatabaseCount('plugins', 2);
     }
 
+    public function test_unchanged_repository_is_skipped_when_the_etag_matches(): void
+    {
+        $this->fakeGitHub(sha: str_repeat('a', 40));
+        $plugin = app(GitHubRepositoryImporter::class)->import('https://github.com/acme/workspace-switcher');
+
+        $etag = $plugin->github_etag;
+        $this->assertNotNull($etag);
+
+        $refresh = app(GitHubRepositoryImporter::class)->import(
+            'https://github.com/acme/workspace-switcher',
+            $etag,
+        );
+
+        $this->assertSame($plugin->id, $refresh->id);
+        $this->assertSame(str_repeat('a', 40), $refresh->latest_commit_sha);
+        $this->assertSame($etag, $refresh->github_etag);
+        $this->assertDatabaseCount('plugins', 1);
+    }
+
     private function fakeGitHub(
         int $stars = 42,
         string $sha = 'abc123',
@@ -105,9 +124,10 @@ class GitHubRepositoryImporterTest extends TestCase
         ?string $redirectedOwner = null,
     ): void {
         $manifest ??= file_get_contents(base_path('tests/Fixtures/plugins/valid/manifest.json'));
+        $etag = 'W/"import-'.$sha.'"';
 
         Http::swap(new Factory);
-        Http::fake(function (Request $request) use ($stars, $sha, $manifest, $redirectedOwner) {
+        Http::fake(function (Request $request) use ($stars, $sha, $manifest, $redirectedOwner, $etag) {
             $path = parse_url($request->url(), PHP_URL_PATH);
 
             // After a redirect the importer addresses the canonical owner path.
@@ -141,7 +161,13 @@ class GitHubRepositoryImporterTest extends TestCase
                 '/repos/acme/workspace-switcher/contents/Service.qml',
                 '/repos/acme/workspace-switcher/contents/Widget.qml' => Http::response(['type' => 'file']),
                 '/repos/acme/workspace-switcher/readme' => Http::response('# Workspace Switcher'),
-                '/repos/acme/workspace-switcher/commits/main' => Http::response(['sha' => $sha]),
+                '/repos/acme/workspace-switcher/commits/main' => function (Request $request) use ($sha, $etag) {
+                    if ($request->hasHeader('If-None-Match') && $request->header('If-None-Match') === $etag) {
+                        return Http::response('', [], 304);
+                    }
+
+                    return Http::response(['sha' => $sha], 200, ['ETag' => $etag]);
+                },
                 '/repos/acme/workspace-switcher/releases/latest' => Http::response(['tag_name' => 'v1.2.0']),
                 '/repos/acme/workspace-switcher/license' => Http::response(['license' => ['spdx_id' => 'MIT']]),
                 default => throw new RuntimeException("Unexpected GitHub request: {$request->url()}"),

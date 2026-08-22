@@ -53,9 +53,11 @@ class RefreshPlugins extends Command
 
         foreach ($plugins as $plugin) {
             $label = "{$plugin->repository_owner}/{$plugin->repository_name}";
+            $previousSha = (string) $plugin->latest_commit_sha;
+            $etag = is_string($plugin->github_etag) ? $plugin->github_etag : null;
 
             try {
-                $fresh = $importer->import($this->repositoryUrl($plugin));
+                $fresh = $importer->import($this->repositoryUrl($plugin), filled($etag) ? $etag : null);
             } catch (GitHubRequestException $exception) {
                 if ($exception->isRateLimit) {
                     $this->newLine();
@@ -77,21 +79,21 @@ class RefreshPlugins extends Command
                 continue;
             }
 
-            if (($fresh->readme_markdown ?? '') !== '') {
+            if ($fresh->latest_commit_sha !== $previousSha) {
                 $updated++;
                 $this->line("  OK    {$label} ({$fresh->latest_commit_sha}) — readme present");
             } else {
                 $unchanged++;
-                $this->line("  NOTE  {$label}: no README found upstream");
+                $this->line("  SAME  {$label} — unchanged since last run");
             }
         }
 
         $this->newLine();
 
         if ($failed > 0) {
-            $this->error("Complete: {$updated} updated, {$unchanged} without a README, {$failed} failed.");
+            $this->error("Complete: {$updated} updated, {$unchanged} unchanged, {$failed} failed.");
         } else {
-            $this->info("Complete: {$updated} updated, {$unchanged} without a README.");
+            $this->info("Complete: {$updated} updated, {$unchanged} unchanged.");
         }
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
