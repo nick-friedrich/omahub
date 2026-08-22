@@ -1,3 +1,16 @@
+@props([
+    'title' => null,
+    'description' => 'A community registry for Omarchy plugins.',
+    'image' => null,
+    'imageAlt' => 'Omahub — a community registry for Omarchy plugins',
+])
+
+@php
+    $siteName = config('app.name', 'Omahub');
+    $pageTitle = $title ? $title.' · '.$siteName : $siteName;
+    $shareImage = $image ?: asset('og-image.png');
+@endphp
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
     <head>
@@ -5,11 +18,22 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        @if (isset($title))
-            <title>{{ $title }} · {{ config('app.name', 'Omahub') }}</title>
-        @else
-            <title>{{ config('app.name', 'Omahub') }}</title>
-        @endif
+        <title>{{ $pageTitle }}</title>
+        <meta name="description" content="{{ $description }}">
+
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="{{ $siteName }}">
+        <meta property="og:title" content="{{ $pageTitle }}">
+        <meta property="og:description" content="{{ $description }}">
+        <meta property="og:url" content="{{ url()->current() }}">
+        <meta property="og:image" content="{{ $shareImage }}">
+        <meta property="og:image:alt" content="{{ $imageAlt }}">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{{ $pageTitle }}">
+        <meta name="twitter:description" content="{{ $description }}">
+        <meta name="twitter:image" content="{{ $shareImage }}">
+        <meta name="twitter:image:alt" content="{{ $imageAlt }}">
 
         @fonts
 

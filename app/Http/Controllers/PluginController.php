@@ -35,8 +35,13 @@ class PluginController extends Controller
 
         abort_if($plugin === null, 404);
 
+        $previewImage = $plugin->readme_markdown !== null
+            ? $markdown->firstImageUrl($plugin->readme_markdown, $plugin->rawContentBaseUrl())
+            : null;
+
         return view('plugins.show', [
             'plugin' => $plugin,
+            'previewImage' => $previewImage,
             'latestScan' => $plugin->securityScans()->with('findings')->orderByDesc('id')->first(),
             'readme' => $plugin->readme_markdown !== null
                 ? $markdown->render($plugin->readme_markdown, $plugin->rawContentBaseUrl())

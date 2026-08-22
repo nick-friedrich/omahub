@@ -1,4 +1,9 @@
-<x-layout :title="$plugin->name">
+<x-layout
+    :title="$plugin->name"
+    :description="$plugin->description"
+    :image="$previewImage"
+    :image-alt="$previewImage ? $plugin->name.' plugin preview' : 'Omahub — a community registry for Omarchy plugins'"
+>
     <a href="{{ route('plugins.index') }}" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
         ← All plugins
     </a>
