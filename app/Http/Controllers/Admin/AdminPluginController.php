@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\PluginStatus;
 use App\Enums\RiskLevel;
 use App\Enums\SecurityScanStatus;
+use App\Exceptions\GitHubRequestException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdatePluginRequest;
 use App\Models\Category;
@@ -96,6 +97,14 @@ class AdminPluginController extends Controller
     {
         try {
             $fresh = $this->importer->import($this->repositoryUrl($plugin));
+        } catch (GitHubRequestException $exception) {
+            if ($exception->isNotFound) {
+                $plugin->markRepositoryRemoved();
+
+                return Redirect::back()->with('error', "Repository no longer available — “{$plugin->name}” was unpublished and disabled.");
+            }
+
+            return Redirect::back()->with('error', "Refresh failed: {$exception->getMessage()}");
         } catch (\Throwable $exception) {
             return Redirect::back()->with('error', "Refresh failed: {$exception->getMessage()}");
         }

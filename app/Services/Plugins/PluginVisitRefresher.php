@@ -18,6 +18,10 @@ class PluginVisitRefresher
 
     public function refreshIfStale(Plugin $plugin): bool
     {
+        if ($plugin->isRepositoryRemoved()) {
+            return false;
+        }
+
         if ($plugin->last_indexed_at !== null
             && $plugin->last_indexed_at->isAfter(now()->subMinutes(self::REFRESH_AFTER_MINUTES))) {
             return false;

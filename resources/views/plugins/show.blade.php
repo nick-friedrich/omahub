@@ -8,6 +8,16 @@
         ← All plugins
     </a>
 
+    @if ($removed)
+        <div class="mt-4 rounded-lg border border-l-4 border-amber-300 border-l-amber-400 bg-amber-50 p-4 dark:border-amber-700 dark:border-l-amber-500 dark:bg-amber-950/40">
+            <p class="font-semibold text-amber-800 dark:text-amber-200">Repository no longer available</p>
+            <p class="mt-1 text-sm leading-relaxed text-amber-800/90 dark:text-amber-200/90">
+                The GitHub repository for this plugin has been deleted or made private, so it cannot be installed and is no
+                longer listed in the registry. This page is kept for reference.
+            </p>
+        </div>
+    @endif
+
     <header class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-4">
             @if ($plugin->icon_url)
@@ -59,7 +69,9 @@
 
     <x-plugin-security-notice :plugin="$plugin" :scan="$latestScan" />
 
-    <x-install-command command="omarchy plugin add {{ $plugin->repository_url }} --enable" />
+    @unless ($removed)
+        <x-install-command command="omarchy plugin add {{ $plugin->repository_url }} --enable" />
+    @endunless
 
     <div class="mt-6 flex flex-wrap gap-2 text-xs">
         @foreach ($plugin->categories as $category)

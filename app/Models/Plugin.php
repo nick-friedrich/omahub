@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'forks_count',
     'open_issues_count',
     'is_archived',
+    'repository_removed_at',
     'last_pushed_at',
     'last_indexed_at',
     'published_at',
@@ -49,6 +50,7 @@ class Plugin extends Model
         return [
             'manifest_data' => 'array',
             'is_archived' => 'boolean',
+            'repository_removed_at' => 'datetime',
             'last_pushed_at' => 'datetime',
             'last_indexed_at' => 'datetime',
             'published_at' => 'datetime',
@@ -62,6 +64,29 @@ class Plugin extends Model
             ->where('status', PluginStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
+    }
+
+    public function isRepositoryRemoved(): bool
+    {
+        return $this->repository_removed_at !== null;
+    }
+
+    public function markRepositoryRemoved(): void
+    {
+        $this->forceFill([
+            'status' => PluginStatus::Archived,
+            'repository_removed_at' => now(),
+        ])->save();
+    }
+
+    public function clearRepositoryRemoved(): void
+    {
+        $this->forceFill([
+            'repository_removed_at' => null,
+            // Restore to Published when the plugin had a public listing before
+            // the repository disappeared (published_at is preserved on removal).
+            'status' => $this->published_at !== null ? PluginStatus::Published : PluginStatus::Pending,
+        ])->save();
     }
 
     /**

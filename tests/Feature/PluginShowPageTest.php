@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PluginStatus;
+use App\Exceptions\GitHubRequestException;
 use App\Jobs\RefreshPlugin;
 use App\Models\Plugin;
 use App\Services\Plugins\GitHubRepositoryImporter;
@@ -116,6 +118,43 @@ class PluginShowPageTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_a_removed_plugin_page_shows_a_notice_and_no_install_command(): void
+    {
+        $plugin = Plugin::factory()->repositoryRemoved()->create();
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertSee('no longer available', escape: false)
+            ->assertDontSee('omarchy plugin add', escape: false);
+    }
+
+    public function test_a_removed_plugin_does_not_dispatch_a_visit_refresh(): void
+    {
+        Queue::fake();
+
+        $plugin = Plugin::factory()->repositoryRemoved()->create([
+            'last_indexed_at' => now()->subHour(),
+        ]);
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertDontSee('Checking GitHub…');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_refresh_status_reports_a_removed_plugin(): void
+    {
+        $plugin = Plugin::factory()->repositoryRemoved()->create();
+
+        $this->getJson(route('plugins.refresh-status', $plugin))
+            ->assertOk()
+            ->assertJson([
+                'refreshing' => false,
+                'removed' => true,
+            ]);
+    }
+
     public function test_refresh_status_reports_when_indexing_finishes(): void
     {
         $plugin = Plugin::factory()->published()->create([
@@ -199,5 +238,24 @@ class PluginShowPageTest extends TestCase
 
         $this->assertFalse(Cache::has(PluginVisitRefresher::cacheKey($plugin->id)));
         $this->assertTrue(Cache::has(PluginVisitRefresher::failureCacheKey($plugin->id)));
+    }
+
+    public function test_refresh_job_unpublishes_a_plugin_whose_repository_is_gone(): void
+    {
+        $plugin = Plugin::factory()->published()->create();
+        $refreshToken = 'refresh-token';
+        Cache::put(PluginVisitRefresher::cacheKey($plugin->id), $refreshToken, now()->addMinutes(5));
+
+        $importer = $this->mock(GitHubRepositoryImporter::class);
+        $importer->shouldReceive('import')->once()
+            ->andThrow(GitHubRequestException::repositoryNotFound());
+
+        (new RefreshPlugin($plugin->id, $refreshToken))->handle($importer);
+
+        $plugin->refresh();
+        $this->assertSame(PluginStatus::Archived, $plugin->status);
+        $this->assertNotNull($plugin->getRawOriginal('repository_removed_at'));
+        $this->assertFalse(Cache::has(PluginVisitRefresher::cacheKey($plugin->id)));
+        $this->assertFalse(Cache::has(PluginVisitRefresher::failureCacheKey($plugin->id)));
     }
 }

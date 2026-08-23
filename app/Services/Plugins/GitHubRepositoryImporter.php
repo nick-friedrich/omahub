@@ -114,6 +114,8 @@ class GitHubRepositoryImporter
                 }
             }
 
+            $wasRemoved = $plugin->isRepositoryRemoved();
+
             $plugin->fill([
                 'name' => trim($manifest['name']),
                 'description' => $this->optionalString($manifest['description'] ?? $repositoryData['description'] ?? null),
@@ -139,6 +141,12 @@ class GitHubRepositoryImporter
                 'last_indexed_at' => now(),
             ]);
             $plugin->save();
+
+            if ($wasRemoved) {
+                // The repository is back: keep it published if it was listed
+                // before removal, otherwise leave the existing status alone.
+                $plugin->clearRepositoryRemoved();
+            }
 
             return $plugin->refresh();
         });

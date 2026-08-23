@@ -27,6 +27,7 @@ trait FakesGitHub
         $manifest ??= file_get_contents(base_path('tests/Fixtures/plugins/valid/manifest.json'));
         $base = "/repos/{$owner}/{$name}";
         $ownerLogin = $redirectedOwner ?? $owner;
+        $etag = 'W/"fake-'.$sha.'"';
 
         $defaults = [
             $base => Http::response([
@@ -50,7 +51,13 @@ trait FakesGitHub
             "{$base}/contents/Service.qml" => Http::response(['type' => 'file']),
             "{$base}/contents/Widget.qml" => Http::response(['type' => 'file']),
             "{$base}/readme" => Http::response('# Workspace Switcher'),
-            "{$base}/commits/main" => Http::response(['sha' => $sha]),
+            "{$base}/commits/main" => function (Request $request) use ($sha, $etag) {
+                if ($request->hasHeader('If-None-Match') && $request->header('If-None-Match') === $etag) {
+                    return Http::response('', [], 304);
+                }
+
+                return Http::response(['sha' => $sha], 200, ['ETag' => $etag]);
+            },
             "{$base}/releases/latest" => Http::response(['tag_name' => 'v1.2.0']),
             "{$base}/license" => Http::response(['license' => ['spdx_id' => 'MIT']]),
         ];
@@ -58,8 +65,18 @@ trait FakesGitHub
         $responses = array_replace($defaults, $routes);
 
         Http::swap(new Factory);
-        Http::fake(function (Request $request) use ($responses) {
+        Http::fake(function (Request $request) use ($responses, $owner, $ownerLogin, $name) {
             $path = parse_url($request->url(), PHP_URL_PATH);
+
+            // After a redirect the importer addresses the canonical owner path,
+            // so map those requests back onto the original (pre-redirect) one.
+            if ($ownerLogin !== $owner) {
+                $path = preg_replace(
+                    "#^/repos/{$ownerLogin}/{$name}#",
+                    "/repos/{$owner}/{$name}",
+                    $path,
+                ) ?? $path;
+            }
 
             if (! array_key_exists($path, $responses)) {
                 throw new RuntimeException("Unexpected GitHub request: {$request->url()}");

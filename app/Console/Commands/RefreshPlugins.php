@@ -49,6 +49,7 @@ class RefreshPlugins extends Command
 
         $updated = 0;
         $unchanged = 0;
+        $removed = 0;
         $failed = 0;
 
         foreach ($plugins as $plugin) {
@@ -66,6 +67,17 @@ class RefreshPlugins extends Command
                     $this->warn("Resume where this run stopped with: php artisan plugins:refresh --after={$plugin->id}".($this->option('missing-readme') ? ' --missing-readme' : ''));
 
                     return self::FAILURE;
+                }
+
+                if ($exception->isNotFound) {
+                    // Repository deleted or made private — unpublish so it is no
+                    // longer listed, and remember so we can restore it if it
+                    // comes back.
+                    $plugin->markRepositoryRemoved();
+                    $removed++;
+                    $this->warn("  GONE  {$label} — repository no longer available (unpublished)");
+
+                    continue;
                 }
 
                 $failed++;
@@ -90,8 +102,8 @@ class RefreshPlugins extends Command
 
         $this->newLine();
 
-        if ($failed > 0) {
-            $this->error("Complete: {$updated} updated, {$unchanged} unchanged, {$failed} failed.");
+        if ($failed > 0 || $removed > 0) {
+            $this->error("Complete: {$updated} updated, {$unchanged} unchanged, {$removed} removed, {$failed} failed.");
         } else {
             $this->info("Complete: {$updated} updated, {$unchanged} unchanged.");
         }

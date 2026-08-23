@@ -53,6 +53,7 @@ class ScanPlugins extends Command
         }
 
         $scanned = 0;
+        $removed = 0;
         $failed = 0;
 
         foreach ($plugins as $plugin) {
@@ -68,6 +69,14 @@ class ScanPlugins extends Command
                     $this->warn("Resume where this run stopped with: php artisan plugins:scan --after={$plugin->id}");
 
                     return self::FAILURE;
+                }
+
+                if ($exception->isNotFound) {
+                    $plugin->markRepositoryRemoved();
+                    $removed++;
+                    $this->warn("  GONE  {$label} — repository no longer available (unpublished)");
+
+                    continue;
                 }
 
                 $failed++;
@@ -87,8 +96,8 @@ class ScanPlugins extends Command
 
         $this->newLine();
 
-        if ($failed > 0) {
-            $this->error("Complete: {$scanned} scanned, {$failed} failed.");
+        if ($failed > 0 || $removed > 0) {
+            $this->error("Complete: {$scanned} scanned, {$removed} removed, {$failed} failed.");
         } else {
             $this->info("Complete: {$scanned} scanned.");
         }
@@ -136,8 +145,11 @@ class ScanPlugins extends Command
         // Scan only plugins whose latest commit has no successful scan yet.
         // Idempotency (scan unique per plugin+commit) makes this the cheap way
         // to keep reviewed state current: refresh commits, then scan --stale.
+        // Plugins whose repository has disappeared are skipped — the refresh
+        // step flags them, so there is nothing left to scan.
         if ($this->option('stale')) {
             $query
+                ->whereNull('repository_removed_at')
                 ->whereNotNull('latest_commit_sha')
                 ->whereDoesntHave('securityScans', function (Builder $q): void {
                     $q->where('status', SecurityScanStatus::Succeeded)

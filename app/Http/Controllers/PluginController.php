@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Plugin;
 use App\Services\Markdown\MarkdownRenderer;
 use App\Services\Plugins\PluginDirectory;
 use App\Services\Plugins\PluginVisitRefresher;
@@ -39,9 +40,18 @@ class PluginController extends Controller
     ): View {
         $plugin = $directory->findBySlug($slug);
 
+        if ($plugin === null) {
+            $plugin = Plugin::query()
+                ->where('slug', $slug)
+                ->whereNotNull('repository_removed_at')
+                ->first();
+        }
+
         abort_if($plugin === null, 404);
 
-        $refreshing = $refresher->refreshIfStale($plugin);
+        $removed = $plugin->isRepositoryRemoved();
+
+        $refreshing = $removed ? false : $refresher->refreshIfStale($plugin);
 
         $previewImage = $plugin->readme_markdown !== null
             ? $markdown->firstImageUrl($plugin->readme_markdown, $plugin->rawContentBaseUrl())
@@ -49,6 +59,7 @@ class PluginController extends Controller
 
         return view('plugins.show', [
             'plugin' => $plugin,
+            'removed' => $removed,
             'refreshing' => $refreshing,
             'previewImage' => $previewImage,
             'latestScan' => $plugin->securityScans()->with('findings')->orderByDesc('id')->first(),
@@ -65,10 +76,20 @@ class PluginController extends Controller
     ): JsonResponse {
         $plugin = $directory->findBySlug($slug);
 
+        if ($plugin === null) {
+            $plugin = Plugin::query()
+                ->where('slug', $slug)
+                ->whereNotNull('repository_removed_at')
+                ->first();
+        }
+
         abort_if($plugin === null, 404);
 
         return response()->json([
-            'refreshing' => $refresher->isRefreshing($plugin),
+            'refreshing' => $plugin->isRepositoryRemoved()
+                ? false
+                : $refresher->isRefreshing($plugin),
+            'removed' => $plugin->isRepositoryRemoved(),
             'indexed_at' => $plugin->last_indexed_at?->toISOString(),
             'commit_sha' => $plugin->latest_commit_sha,
         ])->header('Cache-Control', 'no-store');

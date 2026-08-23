@@ -91,6 +91,9 @@
                                 <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $plugin->status->value === 'published' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200' : ($plugin->status->value === 'pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300') }}">
                                     {{ ucfirst($plugin->status->value) }}
                                 </span>
+                                @if ($plugin->isRepositoryRemoved())
+                                    <span class="ml-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/50 dark:text-red-300">Repo deleted</span>
+                                @endif
                             </td>
                             <td class="px-4 py-3 text-gray-500">{{ Illuminate\Support\Number::abbreviate($plugin->stars_count) }}</td>
                             <td class="px-4 py-3 text-right">

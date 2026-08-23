@@ -3,18 +3,18 @@
 namespace Tests\Feature\Services;
 
 use App\Enums\PluginStatus;
+use App\Exceptions\GitHubRequestException;
 use App\Exceptions\ManifestValidationException;
 use App\Models\Plugin;
 use App\Services\Plugins\GitHubRepositoryImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Factory;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
+use Tests\Concerns\FakesGitHub;
 use Tests\TestCase;
 
 class GitHubRepositoryImporterTest extends TestCase
 {
+    use FakesGitHub;
     use RefreshDatabase;
 
     public function test_it_imports_repository_manifest_and_github_metadata(): void
@@ -117,61 +117,33 @@ class GitHubRepositoryImporterTest extends TestCase
         $this->assertDatabaseCount('plugins', 1);
     }
 
-    private function fakeGitHub(
-        int $stars = 42,
-        string $sha = 'abc123',
-        ?string $manifest = null,
-        ?string $redirectedOwner = null,
-    ): void {
-        $manifest ??= file_get_contents(base_path('tests/Fixtures/plugins/valid/manifest.json'));
-        $etag = 'W/"import-'.$sha.'"';
+    public function test_a_removed_repository_restores_the_plugin_when_it_comes_back(): void
+    {
+        $this->fakeGitHub(sha: str_repeat('a', 40));
+        $plugin = app(GitHubRepositoryImporter::class)->import('https://github.com/acme/workspace-switcher');
+        $plugin->markRepositoryRemoved();
+        $this->assertTrue($plugin->refresh()->isRepositoryRemoved());
 
-        Http::swap(new Factory);
-        Http::fake(function (Request $request) use ($stars, $sha, $manifest, $redirectedOwner, $etag) {
-            $path = parse_url($request->url(), PHP_URL_PATH);
+        $restored = app(GitHubRepositoryImporter::class)->import('https://github.com/acme/workspace-switcher');
 
-            // After a redirect the importer addresses the canonical owner path.
-            if ($redirectedOwner !== null) {
-                $path = preg_replace(
-                    '#^/repos/newowner/workspace-switcher#',
-                    '/repos/acme/workspace-switcher',
-                    $path,
-                ) ?? $path;
-            }
+        $this->assertSame($plugin->id, $restored->id);
+        $this->assertFalse($restored->isRepositoryRemoved());
+        $this->assertNull($restored->repository_removed_at);
+    }
 
-            return match ($path) {
-                '/repos/acme/workspace-switcher' => Http::response([
-                    'name' => 'workspace-switcher',
-                    'html_url' => 'https://github.com/Acme/workspace-switcher',
-                    'description' => 'A workspace utility.',
-                    'homepage' => 'https://example.com/workspace-switcher',
-                    'default_branch' => 'main',
-                    'stargazers_count' => $stars,
-                    'forks_count' => 7,
-                    'open_issues_count' => 2,
-                    'archived' => false,
-                    'pushed_at' => '2026-08-15T12:00:00Z',
-                    'license' => ['spdx_id' => 'MIT'],
-                    'owner' => [
-                        'login' => $redirectedOwner ?? 'Acme',
-                        'html_url' => 'https://github.com/Acme',
-                    ],
-                ]),
-                '/repos/acme/workspace-switcher/contents/manifest.json' => Http::response($manifest),
-                '/repos/acme/workspace-switcher/contents/Service.qml',
-                '/repos/acme/workspace-switcher/contents/Widget.qml' => Http::response(['type' => 'file']),
-                '/repos/acme/workspace-switcher/readme' => Http::response('# Workspace Switcher'),
-                '/repos/acme/workspace-switcher/commits/main' => function (Request $request) use ($sha, $etag) {
-                    if ($request->hasHeader('If-None-Match') && $request->header('If-None-Match') === $etag) {
-                        return Http::response('', [], 304);
-                    }
+    public function test_importing_delete_not_found_throws_a_not_found_exception(): void
+    {
+        Http::fake([
+            'api.github.com/*' => Http::response(['message' => 'Not Found'], 404),
+        ]);
 
-                    return Http::response(['sha' => $sha], 200, ['ETag' => $etag]);
-                },
-                '/repos/acme/workspace-switcher/releases/latest' => Http::response(['tag_name' => 'v1.2.0']),
-                '/repos/acme/workspace-switcher/license' => Http::response(['license' => ['spdx_id' => 'MIT']]),
-                default => throw new RuntimeException("Unexpected GitHub request: {$request->url()}"),
-            };
-        });
+        $this->expectException(GitHubRequestException::class);
+        $this->expectExceptionMessage('The GitHub repository was not found or is not public.');
+
+        try {
+            app(GitHubRepositoryImporter::class)->import('https://github.com/acme/deleted-repo');
+        } finally {
+            $this->assertDatabaseCount('plugins', 0);
+        }
     }
 }

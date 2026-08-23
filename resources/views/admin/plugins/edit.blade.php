@@ -2,6 +2,16 @@
     <a href="{{ route('admin.plugins.index') }}" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">← Plugins</a>
     <h1 class="mt-1 text-2xl font-bold tracking-tight">Edit “{{ $plugin->name }}”</h1>
 
+    @if ($plugin->isRepositoryRemoved())
+        <div class="mt-4 rounded-lg border border-l-4 border-red-300 border-l-red-500 bg-red-50 p-4 dark:border-red-900 dark:border-l-red-500 dark:bg-red-950/30">
+            <p class="font-semibold text-red-800 dark:text-red-300">Repository no longer available</p>
+            <p class="mt-1 text-sm leading-relaxed text-red-800/90 dark:text-red-300/90">
+                The GitHub repository was deleted or made private{{ $plugin->repository_removed_at ? ' on '.$plugin->repository_removed_at->format('M j, Y H:i') : '' }}.
+                This plugin was unpublished automatically. Refresh to re-check, or it will restore automatically if the repository comes back.
+            </p>
+        </div>
+    @endif
+
     <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div class="space-y-6">
             <form method="POST" action="{{ route('admin.plugins.update', $plugin) }}" class="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-[#161615]">

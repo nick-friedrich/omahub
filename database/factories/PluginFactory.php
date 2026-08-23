@@ -63,4 +63,13 @@ class PluginFactory extends Factory
             'is_archived' => true,
         ]);
     }
+
+    public function repositoryRemoved(): static
+    {
+        return $this->state(fn () => [
+            'status' => PluginStatus::Archived,
+            'repository_removed_at' => now(),
+            'published_at' => fake()->dateTimeBetween('-6 months'),
+        ]);
+    }
 }

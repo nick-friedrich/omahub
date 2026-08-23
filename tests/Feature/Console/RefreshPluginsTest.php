@@ -121,12 +121,12 @@ class RefreshPluginsTest extends TestCase
     public function test_it_reports_and_survives_a_failed_repository(): void
     {
         $this->fakeGitHub(routes: [
-            '/repos/missing/nowhere' => Http::response(['message' => 'Not Found'], 404),
+            '/repos/missing/nowhere' => Http::response([], 500),
         ]);
         Plugin::factory()->create([
             'repository_owner' => 'acme',
             'repository_name' => 'workspace-switcher',
-            'status' => PluginStatus::Pending,
+            'status' => PluginStatus::Published,
         ]);
         Plugin::factory()->create([
             'repository_owner' => 'missing',
@@ -135,10 +135,32 @@ class RefreshPluginsTest extends TestCase
         ]);
 
         $this->artisan('plugins:refresh')
-            ->expectsOutputToContain('failed')
+            ->expectsOutputToContain('FAILED')
+            ->expectsOutputToContain('1 failed')
             ->assertFailed();
 
         // The valid one still got refreshed; no exception escaped.
         $this->assertDatabaseCount('plugins', 2);
+    }
+
+    public function test_a_deleted_repository_is_unpublished_and_flagged(): void
+    {
+        $this->fakeGitHub(routes: [
+            '/repos/acme/vaporised' => Http::response(['message' => 'Not Found'], 404),
+        ]);
+        $plugin = Plugin::factory()->create([
+            'repository_owner' => 'acme',
+            'repository_name' => 'vaporised',
+            'status' => PluginStatus::Published,
+            'published_at' => now(),
+        ]);
+
+        $this->artisan('plugins:refresh', ['--ids' => (string) $plugin->id])
+            ->expectsOutputToContain('GONE')
+            ->assertSuccessful();
+
+        $plugin->refresh();
+        $this->assertSame(PluginStatus::Archived, $plugin->status);
+        $this->assertNotNull($plugin->repository_removed_at);
     }
 }
