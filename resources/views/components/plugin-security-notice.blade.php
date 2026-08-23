@@ -97,6 +97,9 @@
                 <p class="mt-0.5 truncate text-xs {{ $palette['verdict'] }}">
                     {{ $verdict }}@if ($count > 0) · {{ $count }} finding{{ $count === 1 ? '' : 's' }}@endif
                 </p>
+                <p class="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">
+                    Deterministic scan — not a security guarantee
+                </p>
             </div>
             @if ($isStale)
                 <span class="hidden shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 sm:inline-flex dark:bg-amber-900/50 dark:text-amber-200">

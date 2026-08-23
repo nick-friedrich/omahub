@@ -48,6 +48,7 @@ class PluginSecurityReviewTest extends TestCase
             ->assertOk()
             ->assertSee('No obvious issues detected')
             ->assertSee('Security review', false)
+            ->assertSee('Deterministic scan — not a security guarantee')
             ->assertSee('Risk level', false)
             ->assertSee(substr($scan->commit_sha, 0, 7));
     }
