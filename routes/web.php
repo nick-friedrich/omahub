@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/plugins', [PluginController::class, 'index'])->name('plugins.index');
+Route::get('/plugins/{plugin:slug}/refresh-status', [PluginController::class, 'refreshStatus'])->name('plugins.refresh-status');
 Route::get('/plugins/{plugin:slug}', [PluginController::class, 'show'])->name('plugins.show');
 Route::get('/categories/{category:slug}', [CategoryController::class, 'show'])->name('categories.show');
 Route::get('/search', [SearchController::class, 'index'])->name('search');

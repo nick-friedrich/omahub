@@ -131,6 +131,19 @@
                     @else
                         never.
                     @endif
+                    @if ($refreshing)
+                        <span
+                            class="ml-1 inline-flex items-center gap-1 font-medium text-gray-700 dark:text-gray-300"
+                            role="status"
+                            aria-live="polite"
+                            data-plugin-refresh-status
+                            data-refresh-url="{{ route('plugins.refresh-status', $plugin) }}"
+                            data-indexed-at="{{ $plugin->last_indexed_at?->toISOString() }}"
+                        >
+                            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-hidden="true"></span>
+                            <span data-refresh-label>Checking GitHub…</span>
+                        </span>
+                    @endif
                 </p>
                 @if ($plugin->latest_commit_sha)
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">

@@ -160,3 +160,62 @@ if (document.readyState === 'loading') {
 } else {
     setupMobileNav();
 }
+
+// A stale plugin is refreshed after the initial response. Poll its lightweight
+// status endpoint and reload once so every imported field changes together.
+function setupPluginRefreshStatus() {
+    document.querySelectorAll('[data-plugin-refresh-status]').forEach((status) => {
+        const url = status.dataset.refreshUrl;
+        const indexedAt = status.dataset.indexedAt || null;
+        const label = status.querySelector('[data-refresh-label]');
+        let attempts = 0;
+
+        if (!url || !label) {
+            return;
+        }
+
+        const poll = async () => {
+            attempts += 1;
+
+            try {
+                const response = await fetch(url, {
+                    cache: 'no-store',
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Plugin refresh status request failed.');
+                }
+
+                const result = await response.json();
+
+                if (result.indexed_at && result.indexed_at !== indexedAt) {
+                    label.textContent = 'Updating page…';
+                    window.location.reload();
+                    return;
+                }
+
+                if (!result.refreshing) {
+                    label.textContent = 'Could not check GitHub right now.';
+                    return;
+                }
+            } catch {
+                // Brief network errors are retried within the polling window.
+            }
+
+            if (attempts === 20) {
+                label.textContent = 'GitHub check is taking longer than expected.';
+            }
+
+            window.setTimeout(poll, attempts >= 20 ? 5000 : 1500);
+        };
+
+        window.setTimeout(poll, 1000);
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupPluginRefreshStatus);
+} else {
+    setupPluginRefreshStatus();
+}

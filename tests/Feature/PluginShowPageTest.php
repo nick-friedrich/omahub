@@ -2,13 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RefreshPlugin;
 use App\Models\Plugin;
+use App\Services\Plugins\GitHubRepositoryImporter;
+use App\Services\Plugins\PluginVisitRefresher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class PluginShowPageTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::flush();
+    }
 
     public function test_detail_page_renders_tables_and_rewrites_relative_images(): void
     {
@@ -67,5 +80,124 @@ class PluginShowPageTest extends TestCase
             ->assertOk()
             ->assertSee('<meta property="og:image" content="'.asset('og-image.png').'">', escape: false)
             ->assertSee('<meta name="twitter:card" content="summary_large_image">', escape: false);
+    }
+
+    public function test_visiting_a_stale_plugin_dispatches_one_deferred_refresh(): void
+    {
+        Queue::fake();
+
+        $plugin = Plugin::factory()->published()->create([
+            'last_indexed_at' => now()->subMinutes(11),
+        ]);
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertSee('Checking GitHub…');
+
+        $this->get(route('plugins.show', $plugin))->assertOk();
+
+        Queue::assertPushed(RefreshPlugin::class, 1);
+        Queue::assertPushed(RefreshPlugin::class, fn (RefreshPlugin $job): bool => $job->pluginId === $plugin->id && $job->connection === 'deferred'
+        );
+    }
+
+    public function test_visiting_a_recently_indexed_plugin_does_not_dispatch_a_refresh(): void
+    {
+        Queue::fake();
+
+        $plugin = Plugin::factory()->published()->create([
+            'last_indexed_at' => now()->subMinutes(9),
+        ]);
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertDontSee('Checking GitHub…');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_refresh_status_reports_when_indexing_finishes(): void
+    {
+        $plugin = Plugin::factory()->published()->create([
+            'last_indexed_at' => now()->subHour(),
+        ]);
+        Cache::put(PluginVisitRefresher::cacheKey($plugin->id), true, now()->addMinutes(5));
+
+        $this->getJson(route('plugins.refresh-status', $plugin))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJson([
+                'refreshing' => true,
+                'indexed_at' => $plugin->last_indexed_at->toISOString(),
+                'commit_sha' => $plugin->latest_commit_sha,
+            ]);
+
+        $plugin->update(['last_indexed_at' => now()]);
+        Cache::forget(PluginVisitRefresher::cacheKey($plugin->id));
+
+        $this->getJson(route('plugins.refresh-status', $plugin))
+            ->assertOk()
+            ->assertJson([
+                'refreshing' => false,
+                'indexed_at' => $plugin->fresh()->last_indexed_at->toISOString(),
+            ]);
+    }
+
+    public function test_refresh_job_uses_the_etag_and_releases_the_visit_lock(): void
+    {
+        $plugin = Plugin::factory()->published()->create([
+            'github_etag' => 'W/"plugin-etag"',
+        ]);
+
+        $importer = $this->mock(GitHubRepositoryImporter::class);
+        $importer->shouldReceive('import')
+            ->once()
+            ->with(
+                "https://github.com/{$plugin->repository_owner}/{$plugin->repository_name}",
+                'W/"plugin-etag"',
+            )
+            ->andReturn($plugin);
+
+        $refreshToken = 'refresh-token';
+        Cache::put(PluginVisitRefresher::cacheKey($plugin->id), $refreshToken, now()->addMinutes(5));
+
+        (new RefreshPlugin($plugin->id, $refreshToken))->handle($importer);
+
+        $this->assertFalse(Cache::has(PluginVisitRefresher::cacheKey($plugin->id)));
+    }
+
+    public function test_failed_refreshes_have_a_cooldown_before_another_visit_retries(): void
+    {
+        Queue::fake();
+
+        $plugin = Plugin::factory()->published()->create([
+            'last_indexed_at' => now()->subHour(),
+        ]);
+        Cache::put(PluginVisitRefresher::failureCacheKey($plugin->id), true, now()->addMinutes(5));
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertDontSee('Checking GitHub…');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_refresh_job_sets_the_failure_cooldown_when_github_fails(): void
+    {
+        $plugin = Plugin::factory()->published()->create();
+        $refreshToken = 'refresh-token';
+        Cache::put(PluginVisitRefresher::cacheKey($plugin->id), $refreshToken, now()->addMinutes(5));
+
+        $importer = $this->mock(GitHubRepositoryImporter::class);
+        $importer->shouldReceive('import')->once()->andThrow(new RuntimeException('GitHub unavailable'));
+
+        try {
+            (new RefreshPlugin($plugin->id, $refreshToken))->handle($importer);
+        } catch (RuntimeException) {
+            // Deferred refresh failures are reported by Laravel after the response.
+        }
+
+        $this->assertFalse(Cache::has(PluginVisitRefresher::cacheKey($plugin->id)));
+        $this->assertTrue(Cache::has(PluginVisitRefresher::failureCacheKey($plugin->id)));
     }
 }

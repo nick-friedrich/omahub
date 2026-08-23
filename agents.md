@@ -89,12 +89,15 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
   when PHP runs directly on the host (local dev).
 - **Keeping scans current.** The public plugin page shows the latest scan as a review
   panel (risk level, analyzed commit, findings) and marks it stale when the analyzed
-  commit predates the plugin's latest indexed commit. Nothing fetches GitHub live per
-  page view. Freshness comes from the scheduler (see `routes/console.php`): an hourly
-  `plugins:refresh` updates commits at :10, then `plugins:scan --stale` at :40
-  re-scans only plugins whose latest commit has no successful scan (unchanged
-  plugins are skipped cheaply via GitHub ETag / If-None-Match). **These run only
-  if a cron triggers Laravel's scheduler** — add one host cron line:
+  commit predates the plugin's latest indexed commit. Visiting a plugin that has not
+  been indexed for 10 minutes dispatches one ETag-aware refresh on Laravel's deferred
+  queue after the response; a cache gate deduplicates visits, and the page polls and
+  reloads when indexing finishes. The scheduler remains the fallback (see
+  `routes/console.php`): an hourly `plugins:refresh` updates commits at :10, then
+  `plugins:scan --stale` at :40 re-scans only plugins whose latest commit has no
+  successful scan (unchanged plugins are skipped cheaply via GitHub ETag /
+  If-None-Match). **Scheduled commands only run if a cron triggers Laravel's
+  scheduler** — add one host cron line:
   ```bash
   * * * * * docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan schedule:run >> /dev/null 2>&1
   ```
