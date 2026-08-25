@@ -10,7 +10,7 @@
                         class="flex items-center justify-between rounded-md px-2 py-1.5 {{ $activeCategory === null ? 'bg-gray-100 font-medium dark:bg-gray-800' : 'hover:bg-gray-100 dark:hover:bg-gray-900' }}"
                     >
                         <span>All</span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $categories->sum('plugins_count') }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $totalPlugins }}</span>
                     </a>
                 </li>
                 @foreach ($categories as $category)

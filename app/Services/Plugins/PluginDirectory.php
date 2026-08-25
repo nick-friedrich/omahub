@@ -14,6 +14,11 @@ class PluginDirectory
 {
     public const PER_PAGE = 12;
 
+    public function totalPublishedCount(): int
+    {
+        return Plugin::query()->published()->count();
+    }
+
     /** @return Builder<Plugin> */
     public function baseQuery(): Builder
     {

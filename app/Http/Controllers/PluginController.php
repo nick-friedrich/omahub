@@ -27,6 +27,7 @@ class PluginController extends Controller
                     : null,
             ])->all(),
             'categories' => $directory->categoriesWithCounts(),
+            'totalPlugins' => $directory->totalPublishedCount(),
             'activeCategory' => $request->query('category') ?: null,
             'activeTag' => $request->query('tag') ?: null,
         ]);
