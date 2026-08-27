@@ -41,7 +41,9 @@ final class DockerSandboxRunner implements SandboxRunner
             '-v', $mount,
             '-w', $containerRepo,
             $this->image,
-            'php', 'artisan', 'scan:execute',
+            // The scan reads the full tarball into memory, and large repos exceed
+            // the default 128M CLI limit — raise it for the sandbox process.
+            'php', '-d', 'memory_limit=1G', 'artisan', 'scan:execute',
             "--owner={$repository->owner}",
             "--repo={$repository->name}",
             "--sha={$sha}",

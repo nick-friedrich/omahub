@@ -76,6 +76,23 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
   `SCAN_SANDBOX_ENABLED=false` to scan in-process instead (no Docker needed).
   `scripts/deploy.sh` preflights all of this on every deploy and fails with a clear
   message when something is missing.
+  - **Socket permission gotcha.** The host socket is `root:docker` (GID 988, mode 660).
+    PHP-FPM workers run as user `app` (uid 1000), which must be a member of a group with
+    GID 988 (`docker`) inside the container — otherwise scans fail with
+    "permission denied while trying to connect to the docker API". `deploy.sh` only
+    preflights the socket as root, so it does **not** catch this. Verify as `app`:
+    `docker exec reverse-proxy-fpm-1 su app -s /bin/sh -c 'docker version'`. If missing,
+    add GID 988 + membership in `/etc/group` (this container has no `usermod`/`gpasswd`):
+    `printf 'docker:x:988:app\n' >> /etc/group`, then `kill -USR2 1`. These container
+    edits are **ephemeral** — re-apply after the container is recreated (see below).
+  - **Scan memory.** The scan downloads full repo tarballs and reads them into memory,
+    and the throwaway sandbox runs with PHP's default 128M CLI limit, so large repos
+    OOM (the host fpm shows "Allowed memory size exhausted", the sandbox exits 255 /
+    "Broken pipe"). The sandbox limit is already raised in code
+    (`docker run … php -d memory_limit=1G artisan scan:execute`). The **host fpm** limit
+    is set via `/usr/local/etc/php/conf.d/zz-memory.ini` (`memory_limit = 1G`) — an
+    **ephemeral** container edit; re-apply (or bake into the image) if the container is
+    recreated.
 - **The sandbox image must provide the application's runtime.** `DockerSandboxRunner`
   runs `php artisan scan:execute` inside the container with this repo bind-mounted
   read-only. Reuse the app's own php-fpm image (or one with the same runtime/autoload)
@@ -109,6 +126,12 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
 - If you change config/env: refresh with `config:cache` (the script does this). The app
   currently has `APP_DEBUG=false` and a cached `config.php` — editing `.env` alone is
   not enough in production.
+- **Scans are serialized per plugin.** Starting a scan for a plugin that already has an
+  in-flight scan throws "A scan for plugin … is already running" (`SecurityScanner` holds
+  a per-plugin cache lock). Running `plugins:scan` while the hourly scheduled scan (`:40`,
+  `withoutOverlapping`) is in flight will report those plugins as FAILED — they are picked
+  up on the next run, so this is safe but noisy. The old behaviour (both processes racing
+  on the same `SecurityScan` row) caused FK violations / "No query results for model".
 
 ## Running tests (host has no PHP)
 

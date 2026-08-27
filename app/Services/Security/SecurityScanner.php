@@ -8,6 +8,7 @@ use App\Models\SecurityScan;
 use App\Security\SandboxRunner;
 use App\Services\GitHub\GitHubClient;
 use App\ValueObjects\GitHubRepository;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 /**
@@ -30,6 +31,25 @@ class SecurityScanner
             throw new RuntimeException("Plugin “{$plugin->name}” has no latest commit to scan.");
         }
 
+        // Serialize scans per plugin so two concurrent processes (e.g. the hourly
+        // scheduler and an ad-hoc/admin scan) never delete each other's in-flight
+        // SecurityScan row. Without this, the non-atomic delete-then-create can
+        // race and produce FK violations / "no query results for model" errors.
+        $lock = Cache::lock('security-scan:'.$plugin->id, 1800);
+
+        if (! $lock->get()) {
+            throw new RuntimeException("A scan for plugin “{$plugin->name}” is already running.");
+        }
+
+        try {
+            return $this->scanLocked($plugin, $sha);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function scanLocked(Plugin $plugin, string $sha): SecurityScan
+    {
         $existing = SecurityScan::query()
             ->where('plugin_id', $plugin->id)
             ->where('commit_sha', $sha)
