@@ -6,6 +6,7 @@ use League\CommonMark\Environment\Environment;
 use League\CommonMark\Event\DocumentParsedEvent;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
+use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
 use League\CommonMark\MarkdownConverter;
 
@@ -32,21 +33,31 @@ class MarkdownRenderer
         $environment->addExtension(new GithubFlavoredMarkdownExtension);
 
         // Rewrite relative image sources to the repository's raw content URLs
-        // so screenshots referenced like ![](preview.png) resolve correctly.
+        // so screenshots referenced like ![](preview.png) resolve correctly,
+        // and rewrite relative links (e.g. [LICENSE](LICENSE)) the same way so
+        // they point at the GitHub raw file rather than a site path that 404s.
         $environment->addEventListener(DocumentParsedEvent::class, function (DocumentParsedEvent $event): void {
             foreach ($event->getDocument()->iterator() as $node) {
-                if (! $node instanceof Image) {
+                if ($node instanceof Image) {
+                    $url = $node->getUrl();
+
+                    if ($this->isLocalPath($url) && $this->imageBaseUrl !== null) {
+                        $node->setUrl($this->resolveContentUrl($url));
+                    }
+
+                    if ($this->extractFirstImage && $this->firstImageUrl === null && $this->isWebUrl($node->getUrl())) {
+                        $this->firstImageUrl = $node->getUrl();
+                    }
+
                     continue;
                 }
 
-                $url = $node->getUrl();
+                if ($node instanceof Link && $this->imageBaseUrl !== null) {
+                    $url = $node->getUrl();
 
-                if ($this->isLocalImage($url) && $this->imageBaseUrl !== null) {
-                    $node->setUrl($this->resolveImageUrl($url));
-                }
-
-                if ($this->extractFirstImage && $this->firstImageUrl === null && $this->isWebUrl($node->getUrl())) {
-                    $this->firstImageUrl = $node->getUrl();
+                    if ($this->isLocalPath($url) && ! $this->isPageAnchor($url)) {
+                        $node->setUrl($this->resolveContentUrl($url));
+                    }
                 }
             }
         });
@@ -86,7 +97,7 @@ class MarkdownRenderer
         }
     }
 
-    private function isLocalImage(string $url): bool
+    private function isLocalPath(string $url): bool
     {
         // Absolute URLs, protocol-relative URLs, data URIs and root paths stay as-is.
         return ! preg_match('/^(?:[a-z][a-z0-9+.-]*:)?\/\/|^(?:data:|\/)/i', $url);
@@ -97,7 +108,12 @@ class MarkdownRenderer
         return preg_match('/^https?:\/\//i', $url) === 1;
     }
 
-    private function resolveImageUrl(string $url): string
+    private function isPageAnchor(string $url): bool
+    {
+        return str_starts_with($url, '#');
+    }
+
+    private function resolveContentUrl(string $url): string
     {
         $path = trim(str_replace('\\', '/', $url), './'); // strip leading ./ or /
         $segments = array_map('rawurlencode', array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));

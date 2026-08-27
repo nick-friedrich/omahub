@@ -109,3 +109,36 @@ docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan config:cache
 - If you change config/env: refresh with `config:cache` (the script does this). The app
   currently has `APP_DEBUG=false` and a cached `config.php` — editing `.env` alone is
   not enough in production.
+
+## Running tests (host has no PHP)
+
+- Run tests via the app's own php-fpm image, bind-mounting the repo at the in-container
+  path. The **security-scan tests need the Docker daemon**, so mount the socket exactly
+  like the prod fpm container does:
+  ```bash
+  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "$PWD":/srv/omahub -w /srv/omahub php-fpm:latest vendor/bin/phpunit
+  ```
+  (`php-fpm:latest` is the image `reverse-proxy-fpm-1` runs; omit the `-v` socket mount
+  only when you want to skip the scan tests — they will error without it.)
+- **A stale compiled config breaks tests.** `bootstrap/cache/config.php` is a generated,
+  git-ignored artifact created by `php artisan config:cache` (deploy step 6). It hard-codes
+  the absolute prod DB path (`/srv/omahub/database/database.sqlite`), and when it exists
+  Laravel ignores `.env`/phpunit overrides — so feature tests fail with
+  `Database file at path [.../database.sqlite] does not exist`. Fix: delete it with
+  `rm bootstrap/cache/config.php` (== `php artisan config:clear`). This only removes the
+  config cache — **it never touches the database**. The deploy script regenerates it with
+  `config:cache` on the server, which is correct there.
+
+## README rendering (relative links/images)
+
+- READMEs are stored as **raw markdown** (`plugins.readme_markdown`) and rendered
+  **per-request** in `PluginController@show` / `@index` (and `HomeController`) via
+  `App\Services\Markdown\MarkdownRenderer`. There is no cached HTML — code changes to
+  the renderer take effect immediately on deploy; no re-index is needed.
+- `MarkdownRenderer` rewrites **relative image AND link** URLs against the repo's raw
+  GitHub base (`Plugin::rawContentBaseUrl()`), so `[LICENSE](LICENSE)` → a raw URL rather
+  than a site path that would 404. Page anchors (`#…`) and absolute/external URLs are
+  left untouched. If you touch link handling, keep the tests in
+  `tests/Unit/Services/MarkdownRendererTest.php` green — they cover relative rewrite,
+  anchor preservation, and the no-base-url case.

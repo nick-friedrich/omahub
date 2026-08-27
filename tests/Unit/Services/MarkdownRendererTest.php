@@ -40,6 +40,42 @@ class MarkdownRendererTest extends TestCase
         );
     }
 
+    public function test_it_rewrites_relative_links_to_raw_content_urls(): void
+    {
+        $html = $this->renderer->render(
+            "[LICENSE](LICENSE)\n\n[Docs](docs/SPEC.md)\n\n[Bin](bin)",
+            'https://raw.githubusercontent.com/nick-friedrich/hyprland-dock/master',
+        );
+
+        $this->assertStringContainsString(
+            'href="https://raw.githubusercontent.com/nick-friedrich/hyprland-dock/master/LICENSE"',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'href="https://raw.githubusercontent.com/nick-friedrich/hyprland-dock/master/docs/SPEC.md"',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'href="https://raw.githubusercontent.com/nick-friedrich/hyprland-dock/master/bin"',
+            $html,
+        );
+    }
+
+    public function test_it_leaves_relative_links_untouched_when_no_base_url_is_given(): void
+    {
+        $html = $this->renderer->render('[LICENSE](LICENSE)\n\n[Anchor](#usage)');
+
+        $this->assertStringContainsString('href="LICENSE"', $html);
+        $this->assertStringContainsString('href="#usage"', $html);
+    }
+
+    public function test_it_keeps_page_anchors_untouched(): void
+    {
+        $html = $this->renderer->render('[Usage](#usage)', 'https://raw.githubusercontent.com/omarchy/example/main');
+
+        $this->assertStringContainsString('href="#usage"', $html);
+    }
+
     public function test_it_leaves_absolute_images_and_links_untouched(): void
     {
         $html = $this->renderer->render(
