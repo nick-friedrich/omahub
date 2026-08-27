@@ -64,5 +64,16 @@ Submitted/repository plugin code is run in an isolated Docker sandbox. The scan 
 checks configured sources against security rules (credential access, eval, destructive
 filesystem, obfuscation, external hosts, etc.), producing `SecurityScan` +
 `SecurityFinding` records surfaced on the public plugin page as a "Security review"
-panel. See `config/security_scan.php` for sandbox/mode config and
-`app/Security/README` (add this next) for the engine details.
+panel. See `config/security_scan.php` for sandbox/mode config.
+
+- Flow: `GitHubClient::tarball()` downloads a repo tar.gz at an exact commit →
+  `SecurityScanner::scan()` (per-plugin cache lock, so the scheduler and ad-hoc runs
+  never race) → `SandboxRunner` (`DockerSandboxRunner` pipes the tarball over stdin to a
+  disposable `docker run` of the app image running `scan:execute`) → `ScanEngine` +
+  `Security/Rules/*` → persisted scan + findings.
+- The sandbox runs `php -d memory_limit=1G artisan scan:execute` because full tarballs
+  exceed the default 128M CLI limit. The host fpm also needs a raised limit
+  (`/usr/local/etc/php/conf.d/zz-memory.ini`) and GID-988 docker-group membership for the
+  `app` user — see `agents.md`. These are ephemeral container edits.
+- Scheduler (routes/console.php): `plugins:refresh` hourly at :10, `plugins:scan --stale`
+  hourly at :40, both `withoutOverlapping`.
