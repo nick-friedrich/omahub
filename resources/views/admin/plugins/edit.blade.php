@@ -12,6 +12,17 @@
         </div>
     @endif
 
+    @if ($plugin->isAiUnpublished())
+        <div class="mt-4 rounded-lg border border-l-4 border-red-300 border-l-red-500 bg-red-50 p-4 dark:border-red-900 dark:border-l-red-500 dark:bg-red-950/30">
+            <p class="font-semibold text-red-800 dark:text-red-300">Auto-unpublished by AI review</p>
+            <p class="mt-1 text-sm leading-relaxed text-red-800/90 dark:text-red-300/90">
+                An AI advisory review{{ $plugin->ai_unpublished_at ? ' on '.$plugin->ai_unpublished_at->format('M j, Y H:i') : '' }}
+                rated the latest commit high/critical risk and recommended avoiding it. The plugin was unpublished automatically.
+                Review the findings below and re-publish manually if you disagree.
+            </p>
+        </div>
+    @endif
+
     <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div class="space-y-6">
             <form method="POST" action="{{ route('admin.plugins.update', $plugin) }}" class="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-[#161615]">

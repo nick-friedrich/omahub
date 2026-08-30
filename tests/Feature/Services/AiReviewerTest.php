@@ -3,6 +3,7 @@
 namespace Tests\Feature\Services;
 
 use App\Enums\AiReviewStatus;
+use App\Enums\PluginStatus;
 use App\Enums\SecurityScanStatus;
 use App\Models\Plugin;
 use App\Services\Ai\AiReviewer;
@@ -25,13 +26,22 @@ class AiReviewerTest extends TestCase
         config(['security_scan.enabled' => false]);
     }
 
-    private function createPlugin(string $sha = 'abc123'): Plugin
+    private function createPlugin(string $sha = 'abc123', bool $published = false): Plugin
     {
-        return Plugin::factory()->create([
+        $plugin = Plugin::factory()->create([
             'repository_owner' => 'acme',
             'repository_name' => 'workspace-switcher',
             'latest_commit_sha' => $sha,
         ]);
+
+        if ($published) {
+            $plugin->forceFill([
+                'status' => PluginStatus::Published,
+                'published_at' => now(),
+            ])->save();
+        }
+
+        return $plugin->refresh();
     }
 
     private function tarballUrl(string $sha): string
@@ -190,5 +200,89 @@ class AiReviewerTest extends TestCase
         $review = $plugin->aiReviews()->first();
         $this->assertNotNull($review);
         $this->assertSame(AiReviewStatus::Failed, $review->status);
+    }
+
+    public function test_a_high_critical_risk_with_avoid_recommendation_auto_unpublishes_a_published_plugin(): void
+    {
+        $plugin = $this->createPlugin('abc123', true);
+        $this->stubHttp(['abc123' => 'malicious'], [
+            ['risk' => 'high', 'recommendation' => 'avoid', 'summary' => 'Downloads and executes an obfuscated payload.', 'concerns' => ['Obfuscated call in setup.sh']],
+        ]);
+
+        app(AiReviewer::class)->review($plugin);
+
+        $plugin->refresh();
+        $this->assertTrue($plugin->isAiUnpublished());
+        $this->assertSame(PluginStatus::Archived, $plugin->status);
+        // published_at is preserved so the plugin can be re-published manually.
+        $this->assertNotNull($plugin->published_at);
+    }
+
+    public function test_critical_risk_with_avoid_auto_unpublishes(): void
+    {
+        $plugin = $this->createPlugin('abc123', true);
+        $this->stubHttp(['abc123' => 'malicious'], [
+            ['risk' => 'critical', 'recommendation' => 'avoid', 'summary' => 'Wipes the system.', 'concerns' => ['rm -rf in postinstall']],
+        ]);
+
+        app(AiReviewer::class)->review($plugin);
+
+        $plugin->refresh();
+        $this->assertTrue($plugin->isAiUnpublished());
+        $this->assertSame(PluginStatus::Archived, $plugin->status);
+    }
+
+    public function test_high_risk_without_avoid_recommendation_does_not_unpublish(): void
+    {
+        $plugin = $this->createPlugin('abc123', true);
+        $this->stubHttp(['abc123' => 'malicious'], [
+            ['risk' => 'high', 'recommendation' => 'review', 'summary' => 'Concerning but not clearly avoid.', 'concerns' => ['Something odd']],
+        ]);
+
+        app(AiReviewer::class)->review($plugin);
+
+        $plugin->refresh();
+        $this->assertFalse($plugin->isAiUnpublished());
+        $this->assertSame(PluginStatus::Published, $plugin->status);
+    }
+
+    public function test_avoid_recommendation_without_high_critical_risk_does_not_unpublish(): void
+    {
+        $plugin = $this->createPlugin('abc123', true);
+        $this->stubHttp(['abc123' => 'malicious'], [
+            ['risk' => 'medium', 'recommendation' => 'avoid', 'summary' => 'Avoid for now.', 'concerns' => []],
+        ]);
+
+        app(AiReviewer::class)->review($plugin);
+
+        $plugin->refresh();
+        $this->assertFalse($plugin->isAiUnpublished());
+        $this->assertSame(PluginStatus::Published, $plugin->status);
+    }
+
+    public function test_a_clean_new_commit_reviews_but_does_not_auto_republish(): void
+    {
+        $plugin = $this->createPlugin('bad123', true);
+        $this->stubHttp(['bad123' => 'malicious', 'good456' => 'clean'], [
+            ['risk' => 'high', 'recommendation' => 'avoid', 'summary' => 'Bad commit.', 'concerns' => []],
+            ['risk' => 'low', 'recommendation' => 'install', 'summary' => 'Good commit.', 'concerns' => []],
+        ]);
+
+        // Auto-unpublish on the bad commit.
+        app(AiReviewer::class)->review($plugin);
+        $plugin->refresh();
+        $this->assertTrue($plugin->isAiUnpublished());
+        $this->assertSame(PluginStatus::Archived, $plugin->status);
+
+        // A later clean commit is reviewed but does NOT auto-republish.
+        $plugin->forceFill(['latest_commit_sha' => 'good456'])->save();
+
+        $review = app(AiReviewer::class)->review($plugin);
+        $plugin->refresh();
+
+        $this->assertSame('good456', $review->commit_sha);
+        $this->assertSame('low', $review->risk_level?->value);
+        $this->assertSame(PluginStatus::Archived, $plugin->status);
+        $this->assertTrue($plugin->isAiUnpublished());
     }
 }

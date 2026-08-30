@@ -2,7 +2,10 @@
 
 namespace App\Services\Ai;
 
+use App\Enums\AiRecommendation;
 use App\Enums\AiReviewStatus;
+use App\Enums\PluginStatus;
+use App\Enums\RiskLevel;
 use App\Models\AiReview;
 use App\Models\Plugin;
 use App\Models\SecurityFinding;
@@ -107,6 +110,8 @@ class AiReviewer
                 'raw_response' => $result->rawResponse,
                 'finished_at' => now(),
             ]);
+
+            $this->autoUnpublishIfMalicious($plugin, $review);
         } catch (\Throwable $exception) {
             $review->update([
                 'status' => AiReviewStatus::Failed,
@@ -117,6 +122,42 @@ class AiReviewer
         }
 
         return $review->refresh();
+    }
+
+    /**
+     * If the AI advisory review of a plugin's latest commit rates it high or
+     * critical risk with an "avoid" recommendation, auto-unpublish the plugin
+     * so a human moderator can investigate. Restoration is always manual. This
+     * is not a publish gate for the deterministic scan — the AI review builds
+     * on it, and a clean AI review never blocks or changes anything.
+     */
+    private function autoUnpublishIfMalicious(Plugin $plugin, AiReview $review): void
+    {
+        if ($review->status !== AiReviewStatus::Succeeded) {
+            return;
+        }
+
+        // Only transition a currently-listed plugin; pending/rejected/archived
+        // plugins are not visible anyway.
+        if ($plugin->status !== PluginStatus::Published) {
+            return;
+        }
+
+        $risk = $review->risk_level;
+
+        if (! in_array($risk, [RiskLevel::High, RiskLevel::Critical], true)) {
+            return;
+        }
+
+        if ($review->recommendation !== AiRecommendation::Avoid) {
+            return;
+        }
+
+        if ($review->commit_sha !== (string) $plugin->latest_commit_sha) {
+            return;
+        }
+
+        $plugin->markAiUnpublished();
     }
 
     /**

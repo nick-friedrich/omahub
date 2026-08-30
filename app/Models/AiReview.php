@@ -14,8 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * An advisory AI review of a plugin repository at an exact commit. It runs on
  * top of the deterministic scan, combines those findings with an independent
  * look at the repository content, and produces a plain-language risk
- * assessment. A review is advisory only — it never replaces or blocks the
- * deterministic review or human approval.
+ * assessment. A review is advisory — it never blocks the deterministic review
+ * or human approval. However, a review of a plugin's latest commit that is
+ * high/critical risk with an "avoid" recommendation triggers an automatic
+ * un-publish (see AiReviewer::autoUnpublishIfMalicious); restoration is manual.
  *
  * Like SecurityScan, a review is keyed to (plugin_id, commit_sha): re-running a
  * review for the same commit is a no-op.

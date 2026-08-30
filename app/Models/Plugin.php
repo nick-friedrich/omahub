@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'open_issues_count',
     'is_archived',
     'repository_removed_at',
+    'ai_unpublished_at',
     'last_pushed_at',
     'last_indexed_at',
     'published_at',
@@ -51,6 +52,7 @@ class Plugin extends Model
             'manifest_data' => 'array',
             'is_archived' => 'boolean',
             'repository_removed_at' => 'datetime',
+            'ai_unpublished_at' => 'datetime',
             'last_pushed_at' => 'datetime',
             'last_indexed_at' => 'datetime',
             'published_at' => 'datetime',
@@ -69,6 +71,24 @@ class Plugin extends Model
     public function isRepositoryRemoved(): bool
     {
         return $this->repository_removed_at !== null;
+    }
+
+    /**
+     * Whether the plugin was auto-unpublished because an AI advisory review of
+     * its latest commit rated it high/critical risk with an "avoid"
+     * recommendation. Restoration is always manual (an admin re-publishes).
+     */
+    public function isAiUnpublished(): bool
+    {
+        return $this->ai_unpublished_at !== null;
+    }
+
+    public function markAiUnpublished(): void
+    {
+        $this->forceFill([
+            'status' => PluginStatus::Archived,
+            'ai_unpublished_at' => now(),
+        ])->save();
     }
 
     public function markRepositoryRemoved(): void

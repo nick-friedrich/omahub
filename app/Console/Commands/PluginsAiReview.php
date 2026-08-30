@@ -92,6 +92,10 @@ class PluginsAiReview extends Command
 
             $reviewed++;
             $this->printReview($review, $label);
+
+            if ($plugin->isAiUnpublished()) {
+                $this->warn('        ⚠ AUTO-UNPUBLISHED — high/critical risk with an “avoid” recommendation (plugin hidden until manually re-published)');
+            }
         }
 
         $this->newLine();

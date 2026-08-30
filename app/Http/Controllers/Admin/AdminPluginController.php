@@ -160,6 +160,7 @@ class AdminPluginController extends Controller
             'published_at' => $targetEnum === PluginStatus::Published
                 ? ($plugin->published_at ?? now())
                 : $plugin->published_at,
+            'ai_unpublished_at' => $targetEnum === PluginStatus::Published ? null : $plugin->ai_unpublished_at,
         ]);
 
         $label = strtolower($targetEnum->value);
