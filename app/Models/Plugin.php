@@ -148,4 +148,20 @@ class Plugin extends Model
     {
         return $this->hasOne(SecurityScan::class)->latestOfMany();
     }
+
+    /** @return HasMany<AiReview, $this> */
+    public function aiReviews(): HasMany
+    {
+        return $this->hasMany(AiReview::class);
+    }
+
+    /**
+     * The most recently created AI review for this plugin.
+     *
+     * @return HasOne<AiReview, $this>
+     */
+    public function latestAiReview(): HasOne
+    {
+        return $this->hasOne(AiReview::class)->latestOfMany();
+    }
 }

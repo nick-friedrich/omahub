@@ -18,7 +18,13 @@ use App\Security\Rules\ShellProfileRule;
 use App\Security\Rules\SudoRule;
 use App\Security\SandboxRunner;
 use App\Security\ScanEngine;
+use App\Services\Ai\AiClient;
+use App\Services\Ai\AiReviewer;
+use App\Services\Ai\OpenRouterClient;
+use App\Services\Ai\RepositoryContentSampler;
+use App\Services\GitHub\GitHubClient;
 use App\Services\Markdown\MarkdownRenderer;
+use App\Services\Security\SecurityScanner;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -65,6 +71,34 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return new LocalSandboxRunner($this->app->make(ScanEngine::class));
+        });
+
+        $this->app->singleton(RepositoryContentSampler::class, function (): RepositoryContentSampler {
+            return new RepositoryContentSampler(
+                maxFiles: (int) config('ai.max_sample_files'),
+                maxLines: (int) config('ai.max_sample_lines'),
+            );
+        });
+
+        $this->app->singleton(AiClient::class, function (): AiClient {
+            return new OpenRouterClient(
+                baseUrl: (string) config('ai.base_url'),
+                key: (string) config('ai.key'),
+                model: (string) config('ai.model'),
+                timeout: (int) config('ai.timeout'),
+            );
+        });
+
+        $this->app->singleton(AiReviewer::class, function (): AiReviewer {
+            return new AiReviewer(
+                scanner: $this->app->make(SecurityScanner::class),
+                github: $this->app->make(GitHubClient::class),
+                client: $this->app->make(AiClient::class),
+                sampler: $this->app->make(RepositoryContentSampler::class),
+                provider: (string) config('ai.provider'),
+                model: (string) config('ai.model'),
+                maxReadmeChars: (int) config('ai.max_readme_chars'),
+            );
         });
     }
 

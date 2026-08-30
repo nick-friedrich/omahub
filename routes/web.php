@@ -42,6 +42,8 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
 
     Route::get('/submissions', [AdminSubmissionController::class, 'index'])->name('submissions.index');
     Route::get('/submissions/{submission}', [AdminSubmissionController::class, 'show'])->name('submissions.show');
+    Route::post('/submissions/{submission}/scan', [AdminSubmissionController::class, 'scan'])->name('submissions.scan');
+    Route::post('/submissions/{submission}/ai-review', [AdminSubmissionController::class, 'aiReview'])->name('submissions.ai-review');
     Route::post('/submissions/{submission}/approve', [AdminSubmissionController::class, 'approve'])->name('submissions.approve');
     Route::post('/submissions/{submission}/reject', [AdminSubmissionController::class, 'reject'])->name('submissions.reject');
 
@@ -50,6 +52,7 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function (): 
     Route::put('/plugins/{plugin}', [AdminPluginController::class, 'update'])->name('plugins.update');
     Route::post('/plugins/{plugin}/refresh', [AdminPluginController::class, 'refresh'])->name('plugins.refresh');
     Route::post('/plugins/{plugin}/scan', [AdminPluginController::class, 'scan'])->name('plugins.scan');
+    Route::post('/plugins/{plugin}/ai-review', [AdminPluginController::class, 'aiReview'])->name('plugins.ai-review');
     Route::post('/plugins/{plugin}/status', [AdminPluginController::class, 'status'])->name('plugins.status');
     Route::delete('/plugins/{plugin}', [AdminPluginController::class, 'destroy'])->name('plugins.destroy');
 });

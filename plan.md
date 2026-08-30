@@ -486,13 +486,18 @@ parsed structured `output`, and the `raw_response`, keyed to the same `(plugin_i
   concern), `SCAN_SANDBOX_ENABLED` (when disabled, scan runs directly for local dev /
   tests), codeload URL.
 
-## Stage 2 — AI review (deferred until deterministic is proven)
+## Stage 2 — AI review (implemented)
 
-- `AiClient` interface + `OpenRouterClient` implementation. Config: `OPENROUTER_API_KEY`,
-  `AI_MODEL`, `OPENROUTER_BASE_URL`.
-- Send manifest, scanned file contents, and the deterministic findings summary with a
-  strict prompt requesting structured JSON. Validate the parsed shape before persisting.
+- `AiClient` interface + `OpenRouterClient` implementation (DeepSeek flash v4 latest via
+  OpenRouter). Config in `config/ai.php`: `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`.
+- `AiReviewer` sends the deterministic findings plus an independent sample of the repo
+  content (manifest, README, sampled source files) with a strict prompt requesting
+  structured JSON. The parsed, validated shape is persisted as an `AiReview`
+  (`AiReviewStatus`, `AiRecommendation`, risk_level, summary, concerns, raw_response)
+  keyed to `(plugin_id, commit_sha)`.
 - A failed AI call records a failed review and does not halt the pipeline (advisory).
+- Triggered manually: `plugins:ai-review` command, admin plugin page, and the
+  "Run scan" / "Run AI review" buttons directly on submissions.
 
 ## Stage 3 — Human review (deferred)
 

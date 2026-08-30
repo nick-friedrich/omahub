@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\SubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\PluginSubmission;
+use App\Services\Ai\AiReviewer;
 use App\Services\Plugins\PluginSubmissionService;
+use App\Services\Security\SecurityScanner;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -15,6 +17,8 @@ class AdminSubmissionController extends Controller
 {
     public function __construct(
         private readonly PluginSubmissionService $submissions,
+        private readonly SecurityScanner $scanner,
+        private readonly AiReviewer $aiReviewer,
     ) {}
 
     public function index(Request $request): View
@@ -38,9 +42,57 @@ class AdminSubmissionController extends Controller
 
     public function show(PluginSubmission $submission): View
     {
+        $submission->load('plugin');
+
+        $plugin = $submission->plugin;
+
         return view('admin.submissions.show', [
-            'submission' => $submission->load('plugin'),
+            'submission' => $submission,
+            'latestScan' => $plugin?->securityScans()->with('findings')->orderByDesc('id')->first(),
+            'latestAiReview' => $plugin?->aiReviews()->orderByDesc('id')->first(),
         ]);
+    }
+
+    public function scan(PluginSubmission $submission): RedirectResponse
+    {
+        $plugin = $submission->plugin;
+
+        if ($plugin === null) {
+            return $this->backWithError('This submission has no imported plugin, so it cannot be scanned.');
+        }
+
+        try {
+            $scan = $this->scanner->scan($plugin);
+        } catch (\Throwable $exception) {
+            return $this->backWithError("Scan failed: {$exception->getMessage()}");
+        }
+
+        $findings = $scan->findings()->count();
+        $summary = $findings === 0
+            ? "No obvious issues detected (commit {$scan->commit_sha})."
+            : "Found {$findings} finding(s), risk level “{$scan->risk_level}” (commit {$scan->commit_sha}).";
+
+        return $this->back()->with('status', "Scan complete. {$summary}");
+    }
+
+    public function aiReview(PluginSubmission $submission): RedirectResponse
+    {
+        $plugin = $submission->plugin;
+
+        if ($plugin === null) {
+            return $this->backWithError('This submission has no imported plugin, so it cannot be AI-reviewed.');
+        }
+
+        try {
+            $review = $this->aiReviewer->review($plugin);
+        } catch (\Throwable $exception) {
+            return $this->backWithError("AI review failed: {$exception->getMessage()}");
+        }
+
+        $risk = $review->risk_level->value ?? 'none';
+        $recommendation = $review->recommendation->value ?? '—';
+
+        return $this->back()->with('status', "AI review complete. Risk level “{$risk}”, recommendation “{$recommendation}”.");
     }
 
     public function approve(PluginSubmission $submission): RedirectResponse
@@ -75,8 +127,8 @@ class AdminSubmissionController extends Controller
         return Redirect::back();
     }
 
-    private function backWithError(\Throwable $exception): RedirectResponse
+    private function backWithError(\Throwable|string $error): RedirectResponse
     {
-        return Redirect::back()->with('error', $exception->getMessage());
+        return Redirect::back()->with('error', $error instanceof \Throwable ? $error->getMessage() : $error);
     }
 }

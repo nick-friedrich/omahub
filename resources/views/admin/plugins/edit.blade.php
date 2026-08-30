@@ -157,6 +157,75 @@
                     </p>
                 @endif
             </div>
+
+            <div class="rounded-lg border border-gray-200 bg-white p-5 text-sm dark:border-gray-800 dark:bg-[#161615]">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-semibold">AI advisory review</h2>
+                        <p class="mt-1 text-xs text-gray-500">Model assessment on top of the deterministic scan. Advisory only.</p>
+                    </div>
+                    <form method="POST" action="{{ route('admin.plugins.ai-review', $plugin) }}">
+                        @csrf
+                        <button type="submit" class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+                            @if ($latestAiReview) Re-run AI review @else Run AI review @endif
+                        </button>
+                    </form>
+                </div>
+
+                @if (!$latestAiReview)
+                    <p class="mt-4 rounded-lg bg-indigo-50 p-3 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+                        No AI review yet. This calls the configured model with the deterministic findings and a sample of the repository contents.
+                    </p>
+                @elseif ($latestAiReview->status->value === 'failed')
+                    <p class="mt-4 rounded-lg bg-red-50 p-3 text-red-800 dark:bg-red-950/40 dark:text-red-200">
+                        The last AI review attempt failed ({{ $latestAiReview->finished_at?->format('M j, Y H:i') ?: 'recently' }}). Re-run to try again.
+                    </p>
+                @elseif ($latestAiReview->status->value === 'running')
+                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">AI review in progress…</p>
+                @else
+                    @php
+                        $risk = $latestAiReview->risk_level?->value ?? 'none';
+                        $riskColor = match ($risk) {
+                            'critical', 'high' => 'bg-red-600 text-white dark:bg-red-500 dark:text-white',
+                            'medium' => 'bg-amber-500 text-[#1b1b18] dark:bg-amber-400 dark:text-[#1b1b18]',
+                            'low' => 'bg-yellow-500 text-[#1b1b18] dark:bg-yellow-400 dark:text-[#1b1b18]',
+                            default => 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white',
+                        };
+                        $rec = $latestAiReview->recommendation?->value ?? null;
+                        $recColor = match ($rec) {
+                            'avoid' => 'bg-red-600 text-white dark:bg-red-500 dark:text-white',
+                            'review' => 'bg-amber-500 text-[#1b1b18] dark:bg-amber-400 dark:text-[#1b1b18]',
+                            default => 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white',
+                        };
+                    @endphp
+
+                    <dl class="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Risk</dt><dd class="mt-0.5"><span class="rounded-full px-2.5 py-0.5 text-xs font-medium {{ $riskColor }}">{{ ucfirst($risk) }}</span></dd></div>
+                        @if ($rec)
+                            <div><dt class="text-gray-500 dark:text-gray-400">Recommendation</dt><dd class="mt-0.5"><span class="rounded-full px-2.5 py-0.5 text-xs font-medium {{ $recColor }}">{{ ucfirst($rec) }}</span></dd></div>
+                        @endif
+                        <div><dt class="text-gray-500 dark:text-gray-400">Model</dt><dd class="mt-0.5 font-mono text-xs">{{ $latestAiReview->model ?? '—' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Commit</dt><dd class="mt-0.5 font-mono text-xs">{{ $latestAiReview->commit_sha }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Reviewed</dt><dd class="mt-0.5">{{ $latestAiReview->finished_at?->format('M j, Y H:i') ?: '—' }}</dd></div>
+                    </dl>
+
+                    @if ($latestAiReview->summary)
+                        <p class="mt-4 leading-relaxed text-gray-700 dark:text-gray-300">{{ $latestAiReview->summary }}</p>
+                    @endif
+
+                    @if (!empty($latestAiReview->concerns))
+                        <ul class="mt-3 space-y-1.5">
+                            @foreach ($latestAiReview->concerns as $concern)
+                                <li class="flex gap-2 text-gray-700 dark:text-gray-300"><span class="text-gray-400">•</span><span>{{ $concern }}</span></li>
+                            @endforeach
+                        </ul>
+                    @endif
+
+                    <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                        AI advisory only — automated analysis, not a security guarantee. Never a substitute for the deterministic scan or human review.
+                    </p>
+                @endif
+            </div>
         </div>
 
         <aside class="space-y-6">

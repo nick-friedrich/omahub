@@ -69,6 +69,8 @@
 
     <x-plugin-security-notice :plugin="$plugin" :scan="$latestScan" />
 
+    <x-plugin-ai-notice :plugin="$plugin" :review="$latestAiReview" />
+
     @unless ($removed)
         <x-install-command command="omarchy plugin add {{ $plugin->repository_url }} --enable" />
     @endunless

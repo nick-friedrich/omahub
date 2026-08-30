@@ -64,6 +64,7 @@ class PluginController extends Controller
             'refreshing' => $refreshing,
             'previewImage' => $previewImage,
             'latestScan' => $plugin->securityScans()->with('findings')->orderByDesc('id')->first(),
+            'latestAiReview' => $plugin->aiReviews()->orderByDesc('id')->first(),
             'readme' => $plugin->readme_markdown !== null
                 ? $markdown->render($plugin->readme_markdown, $plugin->rawContentBaseUrl())
                 : null,

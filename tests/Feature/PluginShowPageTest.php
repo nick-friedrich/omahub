@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AiReviewStatus;
 use App\Enums\PluginStatus;
 use App\Exceptions\GitHubRequestException;
 use App\Jobs\RefreshPlugin;
@@ -141,6 +142,65 @@ class PluginShowPageTest extends TestCase
             ->assertDontSee('Checking GitHub…');
 
         Queue::assertNothingPushed();
+    }
+
+    public function test_detail_page_shows_the_pending_ai_advisory_review_state(): void
+    {
+        $plugin = Plugin::factory()->published()->create();
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertSee('AI advisory review')
+            ->assertSee('not been given an AI review yet', escape: false);
+    }
+
+    public function test_detail_page_shows_a_successful_ai_review_with_summary_and_concerns(): void
+    {
+        $plugin = Plugin::factory()->published()->create(['latest_commit_sha' => 'abc123']);
+
+        $plugin->aiReviews()->create([
+            'commit_sha' => 'abc123',
+            'status' => AiReviewStatus::Succeeded,
+            'provider' => 'openrouter',
+            'model' => '~deepseek/deepseek-v4-flash-latest',
+            'risk_level' => 'medium',
+            'recommendation' => 'review',
+            'summary' => 'The install script downloads extra code and touches the user profile.',
+            'concerns' => ['Downloads from an external host', 'Modifies ~/.bashrc'],
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+        ]);
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertSee('AI advisory review')
+            ->assertSee('Review recommended', escape: false)
+            ->assertSee('Downloads from an external host', escape: false)
+            ->assertSee('Modifies ~/.bashrc', escape: false)
+            ->assertSee('How this check works')
+            ->assertSee('AI advisory only — automated analysis, not a security guarantee.', escape: false);
+    }
+
+    public function test_detail_page_marks_an_ai_review_stale_when_there_is_a_newer_commit(): void
+    {
+        $plugin = Plugin::factory()->published()->create(['latest_commit_sha' => 'newer123']);
+
+        $plugin->aiReviews()->create([
+            'commit_sha' => 'older456',
+            'status' => AiReviewStatus::Succeeded,
+            'provider' => 'openrouter',
+            'model' => '~deepseek/deepseek-v4-flash-latest',
+            'risk_level' => 'low',
+            'recommendation' => 'install',
+            'summary' => 'Fine.',
+            'concerns' => [],
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+        ]);
+
+        $this->get(route('plugins.show', $plugin))
+            ->assertOk()
+            ->assertSee('Newer commit newer12 not yet reviewed', escape: false);
     }
 
     public function test_refresh_status_reports_a_removed_plugin(): void

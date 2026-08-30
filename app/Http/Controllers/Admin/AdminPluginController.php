@@ -11,6 +11,7 @@ use App\Http\Requests\Admin\UpdatePluginRequest;
 use App\Models\Category;
 use App\Models\Plugin;
 use App\Models\Tag;
+use App\Services\Ai\AiReviewer;
 use App\Services\Plugins\GitHubRepositoryImporter;
 use App\Services\Security\SecurityScanner;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,6 +25,7 @@ class AdminPluginController extends Controller
     public function __construct(
         private readonly GitHubRepositoryImporter $importer,
         private readonly SecurityScanner $scanner,
+        private readonly AiReviewer $aiReviewer,
     ) {}
 
     public function index(Request $request): View
@@ -70,6 +72,7 @@ class AdminPluginController extends Controller
         return view('admin.plugins.edit', [
             'plugin' => $plugin->load(['categories', 'tags']),
             'latestScan' => $plugin->securityScans()->with('findings')->orderByDesc('id')->first(),
+            'latestAiReview' => $plugin->aiReviews()->orderByDesc('id')->first(),
             'categories' => Category::query()->orderBy('name')->get(),
             'tags' => Tag::query()->orderBy('name')->get(),
         ]);
@@ -126,6 +129,20 @@ class AdminPluginController extends Controller
             : "Found {$findings} finding(s), risk level “{$scan->risk_level}” (commit {$scan->commit_sha}).";
 
         return Redirect::back()->with('status', "Scan complete. {$summary}");
+    }
+
+    public function aiReview(Plugin $plugin): RedirectResponse
+    {
+        try {
+            $review = $this->aiReviewer->review($plugin);
+        } catch (\Throwable $exception) {
+            return $this->backWithError("AI review failed: {$exception->getMessage()}");
+        }
+
+        $risk = $review->risk_level->value ?? 'none';
+        $recommendation = $review->recommendation->value ?? '—';
+
+        return Redirect::back()->with('status', "AI review complete. Risk level “{$risk}”, recommendation “{$recommendation}” (commit {$review->commit_sha}).");
     }
 
     public function status(Request $request, Plugin $plugin): RedirectResponse

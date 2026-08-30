@@ -18,6 +18,11 @@ Artisan::command('inspire', function () {
 // If-None-Match (304 responses do not count against the API rate limit), so an
 // hourly run stays well inside a 5k/hour token quota even with ~1k plugins.
 //
+// The advisory AI review runs after the deterministic scan, also hourly, and
+// also targets only plugins whose latest commit has no successful review yet
+// (--stale). Because it is idempotent per commit, unchanged plugins are skipped
+// and cost stays bounded to new commits (roughly a fraction of a cent each).
+//
 // These entries only run if something triggers Laravel's scheduler. In production
 // this box has no queue workers, so add one host cron line:
 //   * * * * * docker exec reverse-proxy-fpm-1 php /srv/omahub/artisan schedule:run >> /dev/null 2>&1
@@ -27,4 +32,8 @@ Schedule::command('plugins:refresh')
 
 Schedule::command('plugins:scan --stale')
     ->hourlyAt(40)
+    ->withoutOverlapping();
+
+Schedule::command('plugins:ai-review --stale')
+    ->hourlyAt(50)
     ->withoutOverlapping();
